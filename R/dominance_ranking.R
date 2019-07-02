@@ -15,7 +15,7 @@
 
 dominance_ranking <- function(X, sens){
 
-    require(tidyverse)
+    require(dplyr)
     res <- rep(NA, NROW(X))
     rank <- 1
     PwCp <- pairwise_comparison(X, sens)

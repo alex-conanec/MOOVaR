@@ -24,9 +24,8 @@
 NSGA <- function(X, ff, N, crossing_over_size, freq_mutation,
                  B=500, verbose = TRUE){
 
-    require(tidyverse)
+    require(dplyr)
     require(magrittr)
-    require(rlist)
 
     if (missing(N)) N <- NROW(X) / 2
     sens <- sapply(ff, function(f){
@@ -64,7 +63,7 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation,
         Qt <-lapply(parents, function(couple){
             crossing_over(couple = X[couple,],
                           crossing_position = sample(1:4, crossing_over_size) %>% sort())
-        }) %>% list.rbind()
+        }) %>% bind_rows()
 
         #mutation
         Qt <- mutation(Qt, freq = freq_mutation)

@@ -15,7 +15,7 @@
 #' sum(1:10)
 
 crowding_distance <- function(S){
-    require(tidyverse)
+    require(dplyr)
     distance <- rep(0, NROW(S))
     names(distance) <- 1:NROW(S)
     for (j in 1:NCOL(S)){
