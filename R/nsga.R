@@ -22,10 +22,14 @@
 #' sum(1:10)
 
 NSGA <- function(X, ff, N, crossing_over_size, freq_mutation,
-                 B=500, verbose = TRUE){
+                 B=500, verbose = TRUE, seed){
 
     require(dplyr)
     require(magrittr)
+
+    if (!missing(seed)){
+        set.seed(seed)
+    }
 
     if (missing(N)) N <- NROW(X) / 2
     sens <- sapply(ff, function(f){
