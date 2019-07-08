@@ -18,7 +18,7 @@
 pairwise_comparison <- function(X, sens){
 
     if (any(!sens %in% c("min", "max"))) stop("sens must be either 'min' or 'max'")
-    dom_sens <- c('<', '>')[as.factor(sens=="min")]
+    dom_sens <- c('>', '<')[as.factor(sens=="min")]
     res <- list()
 
     for (k in 1:NROW(X)){
