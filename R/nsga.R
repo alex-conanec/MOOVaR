@@ -36,8 +36,8 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation,
         f$sens
     })
 
+    time_deb <- Sys.time()
     for (b in seq_len(B)){
-
 
         # 1) Evaluation of the performances of each individu for each objectif function
         Y <- sapply(1:length(ff), function(j){
@@ -76,7 +76,11 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation,
         X <- rbind(Pt, Qt)
 
 
-        if (verbose) cat("Population ", b, '\n')
+        if (verbose) {
+            cat("Population ", b, '\n')
+            print(round((Sys.time() - time_deb), 1))
+            cat("\n")
+        }
     }
     list(Pt = Pt, Y = Y[,1:2])
 }
