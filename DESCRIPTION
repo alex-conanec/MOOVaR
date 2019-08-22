@@ -2,7 +2,7 @@ Package: NSGA2
 Type: Package
 Title: Finding the Pareto front using genetic algorithm
 Version: 0.1.0
-Author@R: person("Alexandre", "Conanec", email = "alexandreconanec@gmail.com",
+Author: person("Alexandre", "Conanec", email = "alexandreconanec@gmail.com",
   role = c("aut", "cre"))
 Maintainer: The package maintainer <alexandreconanec@gmail.com>
 Description: Non dominated sorting algorithm II implementation (NSGA-II)
@@ -11,10 +11,14 @@ Encoding: UTF-8
 LazyData: true
 Imports:
     dplyr,
-    magrittr
+    magrittr,
+    processx
 Suggests:
     randomForest,
     knitr,
-    rmarkdown
+    rmarkdown,
+    testthat,
+    ggpubr,
+    tidyr
 RoxygenNote: 6.1.1
 VignetteBuilder: knitr

@@ -3,3 +3,12 @@
 .RData
 .Ruserdata
 inst/doc
+simu_server/
+.gitignore
+.Rbuildignore
+*.Rproj
+man/
+doc
+Meta
+NSGA2_*
+dev/
