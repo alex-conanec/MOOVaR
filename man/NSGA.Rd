@@ -5,7 +5,7 @@
 \title{NSGA II algorithm}
 \usage{
 NSGA(X, ff, N, crossing_over_size, freq_mutation, B = 500,
-  verbose = TRUE)
+  verbose = TRUE, seed)
 }
 \arguments{
 \item{X}{a matrix/data.frame of an initial population}
