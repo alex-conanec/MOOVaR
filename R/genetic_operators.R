@@ -41,19 +41,25 @@ crossing_over <- function(couple, crossing_position){
 mutation <- function(Qt, freq, distribution = "uniform"){
 
     if (missing(Qt)) stop("Qt is missing")
-    if (missing(freq)) stop("Qt is missing")
+    if (missing(freq)) stop("freq is missing")
     if (length(freq) != NCOL(Qt)) stop("You have to assign a frequence of mutation for
                                 each variable")
 
-    sapply(seq_len(NCOL(Qt)), function(j){
+    for (j in seq_len(NCOL(Qt))){
         i <- sample(seq_len(NROW(Qt)), size = ceiling(NROW(Qt)*freq[j]))
-        if (distribution=="uniform"){
-            Qt[i, j] <- runif(length(i), min = min(Qt[,j]), max = max(Qt[,j]))
-        }else if (distribution=="normal"){
-            Qt[i, j] <- rnorm(length(i), mean = mean(Qt[,j]), sd = sd(Qt[,j]))
-        }else{
-            stop("Distribution must be either 'uniform' or 'normal'")
+        if (class(Qt[1,j]) == "numeric"){
+            if (distribution=="uniform"){
+                Qt[i, j] <- runif(length(i), min = min(Qt[,j]), max = max(Qt[,j]))
+            }else if (distribution=="normal"){
+                Qt[i, j] <- rnorm(length(i), mean = mean(Qt[,j]), sd = sd(Qt[,j]))
+            }else{
+                stop("Distribution must be either 'uniform' or 'normal'")
+            }
+        }else if (class(Qt[1,j]) == "factor"){
+            Qt[i, j] <- sample(x = as.character(levels(Qt[1, j])),
+                               size = length(i),
+                               replace = TRUE)
         }
-        Qt[,j]
-    })
+    }
+    Qt
 }
