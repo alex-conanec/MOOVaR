@@ -13,6 +13,7 @@
 #'
 #' @examples
 #' sum(1:10)
+#' @export
 
 crowding_distance <- function(S){
     require(dplyr)

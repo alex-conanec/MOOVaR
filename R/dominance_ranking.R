@@ -12,6 +12,7 @@
 #'
 #' @examples
 #' sum(1:10)
+#' @export
 
 dominance_ranking <- function(X, sens){
 
