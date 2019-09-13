@@ -40,6 +40,15 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         f$sens
     })
 
+    distri_Xi <- lapply(X, function(x){
+        if (class(x) == "numeric"){
+            list(min = floor(min(x)), max = round(max(x)),
+                 mean = mean(x), sd = sd(x))
+        }else if (class(x) == "factor"){
+            list(levels = levels(x))
+        }
+    })
+
     time_deb <- Sys.time()
     for (b in seq_len(B)){
 
@@ -94,7 +103,8 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
             }
 
             #mutation
-            Qt <- mutation(Qt, freq = freq_mutation) %>% as.data.frame()
+            Qt <- mutation(Qt, freq = freq_mutation, distri_Xi = distri_Xi) %>%
+                as.data.frame()
 
             #check for constraints
             if (!is.null(constraints)){

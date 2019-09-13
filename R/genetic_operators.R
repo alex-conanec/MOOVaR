@@ -38,7 +38,7 @@ crossing_over <- function(couple, crossing_position){
 #' @examples
 #' sum(1:10)
 
-mutation <- function(Qt, freq, distribution = "uniform"){
+mutation <- function(Qt, freq, distribution = "uniform", distri_Xi){
 
     if (missing(Qt)) stop("Qt is missing")
     if (missing(freq)) stop("freq is missing")
@@ -47,16 +47,22 @@ mutation <- function(Qt, freq, distribution = "uniform"){
 
     for (j in seq_len(NCOL(Qt))){
         i <- sample(seq_len(NROW(Qt)), size = ceiling(NROW(Qt)*freq[j]))
+        var <- names(Qt)[j]
         if (class(Qt[1,j]) == "numeric"){
             if (distribution=="uniform"){
-                Qt[i, j] <- runif(length(i), min = min(Qt[,j]), max = max(Qt[,j]))
+                min_j <- distri_Xi[[var]]$min
+                max_j <- distri_Xi[[var]]$max
+                Qt[i, j] <- runif(length(i), min = min_j, max = max_j)
             }else if (distribution=="normal"){
-                Qt[i, j] <- rnorm(length(i), mean = mean(Qt[,j]), sd = sd(Qt[,j]))
+                mean_j <- distri_Xi[[var]]$mean
+                sd_j <- distri_Xi[[var]]$sd
+                Qt[i, j] <- rnorm(length(i), mean = mean_j, sd = sd_j)
             }else{
                 stop("Distribution must be either 'uniform' or 'normal'")
             }
         }else if (class(Qt[1,j]) == "factor"){
-            Qt[i, j] <- sample(x = as.character(levels(Qt[1, j])),
+            levels_j <- distri_Xi[[var]]$levels
+            Qt[i, j] <- sample(x = levels_j,
                                size = length(i),
                                replace = TRUE)
         }
