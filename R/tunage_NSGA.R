@@ -26,7 +26,7 @@ tunage_NSGA <- function(boundary_param, boundary_space, NSGA_param, nMC = 10^3,
     })
 
     #on creer une function qui retourne l'air sous la courbe dans le cube MC
-    efficacity <- function(x, NSGA_param, spaceMC){
+    accuracy <- function(x, NSGA_param, spaceMC){
 
         if (class(x) %in% c("data.frame", "matrix")){
             numCores <- parallel::detectCores()
@@ -64,11 +64,11 @@ tunage_NSGA <- function(boundary_param, boundary_space, NSGA_param, nMC = 10^3,
                               sens = sens)
         }
     }
-    formals(efficacity)$NSGA_param <- NSGA_param
-    formals(efficacity)$spaceMC <- spaceMC
+    formals(accuracy)$NSGA_param <- NSGA_param
+    formals(accuracy)$spaceMC <- spaceMC
 
 
-    time_eff <- function(x, NSGA_param){
+    time_running <- function(x, NSGA_param){
 
         if (class(x) %in% c("data.frame", "matrix")){
             numCores <- parallel::detectCores()
@@ -91,7 +91,7 @@ tunage_NSGA <- function(boundary_param, boundary_space, NSGA_param, nMC = 10^3,
             system.time(do.call(NSGA, NSGA_param))[3]
         }
     }
-    formals(time_eff)$NSGA_param <- NSGA_param
+    formals(time_running)$NSGA_param <- NSGA_param
 
 
     #minimisation of to_opt
@@ -122,8 +122,8 @@ tunage_NSGA <- function(boundary_param, boundary_space, NSGA_param, nMC = 10^3,
     )
 
     NSGA(X = param0,
-         ff = list(efficacity = list(f = efficacity, sens = "min"),
-                   time_eff = list(f = time_eff, sens = "min")),
+         ff = list(accuracy = list(f = accuracy, sens = "min"),
+                   time_running = list(f = time_running, sens = "min")),
          crossing_over_size = 2,
          freq_mutation = c(0.5, 0.5, 0.5),
          B = B)
