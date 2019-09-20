@@ -114,13 +114,13 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
                     }) %>% all()
                 })
             }else{
-                passed_constraints <- rep(TRUE, N)
+                passed_constraints <- rep(TRUE, NROW(Qt))
             }
 
             Qt <- Qt[passed_constraints,]
 
             # out of the loop if everything is all right
-            if (NROW(Qt) == N){
+            if (NROW(Qt) == floor(N/2)*2){
                 break
             }
 
