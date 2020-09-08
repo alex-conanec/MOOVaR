@@ -22,27 +22,25 @@ pairwise_comparison <- function(X, sens){
     dom_sens <- sens
     dom_sens[which(sens == "min")] <- '<'
     dom_sens[which(sens == "max")] <- '>'
-    res <- list()
 
     if (class(X) == "numeric") X <- data.frame(X)
-    for (k in 1:NROW(X)){
-        res[[as.character(k)]]$dominated_count <- 0
-        res[[as.character(k)]]$dominating_index <- NULL
 
-        for (i in (1:NROW(X))[-k]){
+    b = lapply(seq_len(NCOL(X)), function(j){
 
-            comp <- comparaison(X1 = X[k,],
-                                X2 = X[i,],
-                                sens = sens)
+        A = matrix(X[,j], nrow = NROW(X), ncol = NROW(X), byrow = F)
+        outer(A - t(A), 0, dom_sens[j])
 
-            if (!is.null(comp)){
-                if (comp){
-                    res[[k]]$dominating_index <- c(res[[k]]$dominating_index, i)
-                }else{
-                    res[[k]]$dominated_count <- res[[k]]$dominated_count + 1
-                }
-            }
-        }
-    }
-    res
+    })
+
+    m = array(unlist(b), dim = c(NROW(X), NROW(X), NCOL(X)))
+
+    domination = apply(m, 1:2, all)
+
+    lapply(seq_len(NROW(X)), function(i){
+        list(
+            dominating_index = which(domination[i,]),
+            dominated_count = length(which(domination[,i]))
+            )
+    })
+
 }
