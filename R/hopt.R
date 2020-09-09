@@ -4,8 +4,6 @@
 #'
 #' @param X a numerical vector, matrix, or data.frame of explanatory variables of dimension nxq.
 #' @param Y a numerical vector of response variable of size n.
-#' @param n_tilde a positive integer lower than n, to perform a cross-validation
-#' with a less expessive cost than with leave-one-out method.
 #' @param h0 initialisation of the h value of the optimisation process. By default equals to rep(0.5, p).
 #' @param lower a numerical vector low bownding hopt. By default equals to rep(0.01, q).
 #' @param upper a numerical vector low bownding hopt. By default equals to rep(2, q).
@@ -23,62 +21,87 @@
 #' X <- as.data.frame(X)
 #'
 #' #critere optimiser manuellement
-#' critere_hopt <- function(h, E){
-#'   X_tilde <- X[E, , drop = FALSE]
-#'   Y_tilde <- Y[E]
-#'   n_range <- seq_len(n_tilde)
-#'   parallel::mclapply(n_range, function(k){
-#'     sapply(n_range[-k], function(i){
-#'       ( as.numeric(Y_tilde[k] <= Y_tilde[i]) -
-#'           F_n(X = X, Y = Y,
-#'               x = X_tilde[k,], y = Y_tilde[i],
-#'               h_n = h, k = E[k]) )^2
-#'     }) %>% mean()
-#'   }, mc.cores = 8) %>% unlist() %>% sum()
+#' critere_hopt = function(h, Xo, Yo){
+#'
+#'   q = NCOL(Xo)
+#'   n = NROW(Xo)
+#'
+#'   #calcul de toutes les distances une à une ponderer par la largeur de la fenetre
+#'   b = lapply(seq_len(q), function(j){
+#'     A = matrix(Xo[,j], nrow = n, ncol = n, byrow = F)
+#'     (A - t(A)) / h[j]
+#'   })
+#'
+#'   # transformation de la liste sous forme de array pour utiliser apply apres
+#'   d = array(unlist(b), dim = c(n, n, q))
+#'
+#'   # application du noyaux aux distances sotckees dans d
+#'   w = (2*pi)^(-q/2)*exp(-apply(d^2, c(1,2), sum)/2)
+#'
+#'   # indicatrice pour chaque y en pairwise
+#'   A = matrix(Yo, nrow = length(Yo), ncol = length(Yo), byrow = F)
+#'   ind_y = apply(A - t(A) < 0, c(1,2), as.numeric)
+#'
+#'   #double (triple) somme vectorisee
+#'   diag(w) = 0
+#'   B = w %*% t(ind_y)
+#'   diag(B) = 0
+#'   sum( (t(ind_y) - B/colSums(w))^2 )
+#'
 #' }
 #'
-#' n_tilde <- 50 #play with it to find a trade-off between time computing and h stability
-#' E <- sample(x = seq_len(n), n_tilde)
-#' h_range <- seq(0.01, 0.8, 0.1)
+#' formals(critere_hopt)$Xo = X
+#' formals(critere_hopt)$Yo = Y
 #'
-#' res <- sapply(h_range, critere_hopt, E = E)
+#' h_range <- seq(0.01, 0.5, 0.05)
+#'
+#' res <- sapply(h_range, critere_hopt)
 #' plot(x = h_range, y = res, type = 'b')
 #'
-#' hopt(X = X, Y = Y, n_tilde = 100)
-
+#' hopt(X = X, Y = Y)
+#'
 #' @export
 
-hopt <- function(X, Y, n_tilde = NULL, h0 = rep(0.5, NCOL(X)),
-                 lower = rep(0.01, NCOL(X)), upper = rep(2, NCOL(X))){
+hopt <- function(X, Y, h0 = rep(0.5, NCOL(X)), lower = rep(0.01, NCOL(X)),
+                 upper = rep(2, NCOL(X))){
 
   X <- as.data.frame(X)
   q <- NCOL(X)
-  n <- NROW(X)
 
-  if (is.null(n_tilde)) n_tilde <- n
+  critere_hopt = function(h, Xo, Yo){
 
-  critere_hopt <- function(h, E){
-    X_tilde <- X[E, , drop = FALSE]
-    Y_tilde <- Y[E]
-    n_range <- seq_len(n_tilde)
-    parallel::mclapply(n_range, function(k){
-      sapply(n_range[-k], function(i){
-        ( as.numeric(Y_tilde[k] <= Y_tilde[i]) -
-            F_n(X = X, Y = Y,
-                x = X_tilde[k,], y = Y_tilde[i],
-                h_n = h, k = E[k]) )^2
-      }) %>% mean()
-    }, mc.cores = 8) %>% unlist() %>% sum()
+    q = NCOL(Xo)
+    n = NROW(Xo)
+
+    #calcul de toutes les distances une à une ponderer par la largeur de la fenetre
+    b = lapply(seq_len(q), function(j){
+      A = matrix(Xo[,j], nrow = n, ncol = n, byrow = F)
+      (A - t(A)) / h[j]
+    })
+
+    # transformation de la liste sous forme de array pour utiliser apply apres
+    d = array(unlist(b), dim = c(n, n, q))
+
+    # application du noyaux aux distances sotckees dans d
+    w = (2*pi)^(-q/2)*exp(-apply(d^2, c(1,2), sum)/2)
+
+    # indicatrice pour chaque y en pairwise
+    A = matrix(Yo, nrow = length(Yo), ncol = length(Yo), byrow = F)
+    ind_y = apply(A - t(A) < 0, c(1,2), as.numeric)
+
+    #double (triple) somme vectorisee
+    diag(w) = 0
+    B = w %*% t(ind_y)
+    diag(B) = 0
+    sum( (t(ind_y) - B/colSums(w))^2 )
+
   }
 
-  E <- sample(x = seq_len(n), n_tilde)
-  formals(critere_hopt)$E <- E
-
+  formals(critere_hopt)$Xo = X
+  formals(critere_hopt)$Yo = Y
 
   if (q > 1){
-    res <- optim(par = h0,
-          # lower = lower, upper = upper,
-          fn = critere_hopt)
+    res <- optim(par = h0, fn = critere_hopt)
     list(h = res$par, min_criteria = res$value)
 
   }else{
