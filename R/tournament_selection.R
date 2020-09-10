@@ -10,23 +10,19 @@
 #'
 #' @examples
 #' sum(1:10)
+#' @export
 
-tournament_selection <- function(X, N){
+tournament_selection <- function(Y, N){
 
-    lapply(seq_len(N), function(i){
-        temp <- sample(1:NROW(X), 4, replace = FALSE)
-        sapply(c(1,3), function(j){
-            if (X[temp[j],]$rank < X[temp[j+1],]$rank){
-                temp[j]
-            }else if (X[temp[j],]$rank > X[temp[j+1],]$rank){
-                temp[j+1]
-            }else if (X[temp[j],]$crowding_distance > X[temp[j+1],]$crowding_distance){
-                temp[j]
-            }else if (X[temp[j],]$crowding_distance < X[temp[j+1],]$crowding_distance){
-                temp[j+1]
-            }else{
-                temp[j]
-            }
-        })
-    })
+    a = matrix(sample(1:N, 2*N, replace = TRUE), ncol = 2, byrow = T, nrow = N)
+
+    diff_rank = Y$rank[a[,1]] - Y$rank[a[,2]]
+
+    equal = diff_rank == 0
+
+    diff_crowding_distance = Y$crowding_distance[a[,1]] - Y$crowding_distance[a[,2]]
+
+    matrix(c(a[diff_rank < 0, 1], a[diff_rank > 0, 2],
+             a[diff_crowding_distance >= 0 & equal, 1], a[diff_crowding_distance < 0 & equal, 2]),
+           ncol = 2, byrow = TRUE)
 }

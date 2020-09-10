@@ -4,12 +4,12 @@
 \alias{tournament_selection}
 \title{Tournement selection}
 \usage{
-tournament_selection(X, N)
+tournament_selection(Y, N)
 }
 \arguments{
-\item{X}{a matrix/data.frame of all the selected individus evaluation}
-
 \item{N}{size of the Qt population to generate}
+
+\item{X}{a matrix/data.frame of all the selected individus evaluation}
 }
 \value{
 a list of couple index which must be use for crossing over

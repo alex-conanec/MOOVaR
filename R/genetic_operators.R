@@ -11,13 +11,18 @@
 #'
 #' @examples
 #' sum(1:10)
+#' @export
 
-crossing_over <- function(couple, crossing_position){
+crossing_over <- function(X, parents, crossing_over_size){
 
-    temp <- couple[1, crossing_position]
-    couple[1, crossing_position] <- couple[2, crossing_position]
-    couple[2, crossing_position] <- temp
-    couple
+    c1 = 1:crossing_over_size
+    c2 = (crossing_over_size+1):NCOL(X)
+
+    rbind(
+        cbind(X[parents[,1], c1, drop = FALSE], X[parents[,2], c2, drop = FALSE]),
+        cbind(X[parents[,1], c2, drop = FALSE], X[parents[,2], c1, drop = FALSE])
+    )
+
 }
 
 #' Mutation operator
@@ -37,8 +42,8 @@ crossing_over <- function(couple, crossing_position){
 #'
 #' @examples
 #' sum(1:10)
-
-mutation <- function(Qt, freq, distribution = "uniform", distri_Xi){
+#' @export
+mutation <- function(Qt, freq, distri_Xi, distribution = "uniform"){
 
     if (missing(Qt)) stop("Qt is missing")
     if (missing(freq)) stop("freq is missing")

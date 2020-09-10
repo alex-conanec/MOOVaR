@@ -15,24 +15,25 @@
 #' sum(1:10)
 #' @export
 
-crowding_distance <- function(S){
-    require(dplyr)
-    distance <- rep(0, NROW(S))
-    names(distance) <- 1:NROW(S)
-    for (j in 1:NCOL(S)){
-        temp <- sort(S[,j])
-        id <- data.frame(id = 1:NROW(S), value = S[,j]) %>%
-            arrange(value) %>% pull(id)
-        interval <- max(temp) - min(temp)
-        if (interval == 0) interval <- 10^20
-        distance[id[1]] <- 10^50
-        distance[id[NROW(S)]] <- 10^50
+crowding_distance <- function(Y){
 
-        if (NROW(S) > 2){
-            for (i in 2:(NROW(S)-1)){
-                distance[id[i]] <- distance[id[i]] + (temp[i+1]-temp[i-1])/interval
-            }
+    lapply(unique(Y$rank), function(r){
+        a = Y %>% filter(rank == r)
+
+        if (NROW(a) < 2){
+            cbind(a, crowding_distance = rep((NCOL(Y)-2)*10^5, NROW(a)))
+        }else{
+            lapply(seq_len(NCOL(Y)-2), function(j){
+                b = a[order(a[,j]),]
+                nn = NROW(b)
+                b[,j] = c(10^5,
+                          (b[-(1:2), j] - b[-((nn-1):nn), j])/(b[NROW(b),j] - b[1,j]),
+                          10^5)
+                b[order(b$id),j]
+            }) %>% bind_cols() %>% rowSums() -> distance
+
+            cbind(a, crowding_distance = distance)
         }
-    }
-    distance
+    }) %>% bind_rows() %>% arrange(id)
+
 }

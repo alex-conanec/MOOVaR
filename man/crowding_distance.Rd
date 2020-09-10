@@ -4,7 +4,7 @@
 \alias{crowding_distance}
 \title{Crowding distance}
 \usage{
-crowding_distance(S)
+crowding_distance(Y)
 }
 \arguments{
 \item{S}{a matrix/data.frame of evaluated points belonging to the same front}
