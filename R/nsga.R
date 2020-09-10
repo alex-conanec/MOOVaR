@@ -18,11 +18,36 @@
 #'
 #' @return a vecteur of rank associated with the individus of X
 #'
+#' @examples
+#' library(tidyverse)
+#' set.seed(123)
+#' n <- 300
+#' q = 3
+#' mini <- rep(x = -2, times = q)
+#' maxi <- rep(x = 2, times = q)
+#'
+#' X <- lapply(seq_len(q), function(k){
+#'     res <- data.frame(X=runif(n = n, min = mini[k], max = maxi[k]))
+#'     names(res) <- paste0("X", k)
+#'     res
+#' }) %>% bind_cols()
+#'
+#' ff <- list(
+#'     list(f = function(X) unlist(X[1] + 2*X[2] + X[3]),
+#'          sens = "min"),
+#'     list(f = function(X) unlist(-X[1] - X[2] - 3*X[3]),
+#'          sens = 'min')
+#' )
+#'
+#' library(NSGA2)
+#' NSGA(X=X[1:50,], ff, N = 50, crossing_over_size = 2, freq_mutation = rep(0.3, q),
+#'     seed = 123, constraints = NULL, B=50, crossing_type = "hybrid",
+#'     verbose = TRUE, time_out = 5)
+#'
 #' @export
 
 NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
-                 constraints = NULL, B=500, crossing_type = "hybrid",
-                 verbose = TRUE, time_out = 5){
+                 B=500, verbose = TRUE){
 
     require(dplyr)
     require(magrittr)
@@ -63,13 +88,13 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         }) %>% as.data.frame() %>% mutate(id = 1:NROW(.))
 
         # 2) Select the best indivdu base (Pt) on the domination notion
-        Y <- Y %>% mutate(rank = dominance_ranking(.[,-NCOL(Y)], sens))
+        Y$rank = dominance_ranking(Y[,-NCOL(Y)], sens)
 
         if (NCOL(Y) > 3){
-            Y <- Y %>% bind_cols(crowding_distance = sapply(Y$rank %>% unique(), function(rank){
-                crowding_distance(S = Y[Y$rank==rank, -((NCOL(Y)-1):NCOL(Y))])
-            }) %>% unlist() %>% as.numeric()) %>% arrange(rank, desc(crowding_distance)) %>%
-                head(N)
+
+            Y = crowding_distance(Y)
+            Y = Y %>% arrange(rank, desc(crowding_distance)) %>% head(N)
+
         }else{
             Y <- head(Y, N) %>% mutate(crowding_distance = runif(NROW(.)))
         }
@@ -78,61 +103,13 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         Pt <- X[Y$id,]
 
         # 3) Pick a couples to be reproduce after a tournement selection
-        parents <- tournament_selection(Y, floor(NROW(X) - N)/2)
+        parents <- tournament_selection(Y, N) # ici il  ya un pb si NROW(X)>N
 
         # 4) Generate new individu (Qt) with genetic operator apply on each
-        # couple, in respect to the set constraints
-        start_loop <- Sys.time()
-        repeat{
+        Qt <- crossing_over(X, parents = parents, crossing_over_size = crossing_over_size)
+        Qt <- mutation(Qt, freq = freq_mutation, distri_Xi = distri_Xi) %>%
+            as.data.frame()
 
-            if (crossing_type == "hybrid"){
-                #crossing over
-                Qt <- lapply(parents, function(couple){
-                    crossing_over(couple = X[couple,],
-                                  crossing_position = sample(seq_along(X),
-                                                             crossing_over_size) %>%
-                                      sort())
-                }) %>% bind_rows()
-            }else{
-                #auto breeding
-                Qt <- lapply(seq_len(N), function(i){
-                    crossing_position = sample(seq_along(X), crossing_over_size)
-                    structure(cbind(Pt[i, crossing_position], Pt[i, -crossing_position]),
-                              colnames = colnames(Pt))
-                    }) %>% bind_rows()
-            }
-
-            #mutation
-            Qt <- mutation(Qt, freq = freq_mutation, distri_Xi = distri_Xi) %>%
-                as.data.frame()
-
-            #check for constraints
-            if (!is.null(constraints)){
-                passed_constraints <- sapply(seq_len(NROW(Qt)), function(i){
-                    sapply(constraints, function(constraint){
-                        constraint(as.data.frame(Qt[i,]))
-                    }) %>% all()
-                })
-            }else{
-                passed_constraints <- rep(TRUE, NROW(Qt))
-            }
-
-            Qt <- Qt[passed_constraints,]
-
-            # out of the loop if everything is all right
-            if (NROW(Qt) == floor(N/2)*2){
-                break
-            }
-
-            # stop the algorithme if time out
-            if (difftime(time1 = Sys.time(),
-                         time2 = start_loop,
-                         units = "min") > time_out){
-                stop(paste("Time out when generating new population. Check if",
-                     "the constraints are not too strick (even impossible)",
-                     "or increase time_out arg"))
-            }
-        }
 
         # 5) Gather the Pt and Qt and proceed to the next iteration
         X <- rbind(Pt, Qt)
