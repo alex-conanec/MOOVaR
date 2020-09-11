@@ -1,4 +1,4 @@
 library(testthat)
-library(NSGA2)
+library(optisure)
 
-test_check("NSGA2")
+test_check("optisure")

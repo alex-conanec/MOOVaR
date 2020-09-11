@@ -4,7 +4,4 @@
 .Ruserdata
 .Rbuildignore
 *.Rproj
-man/
-doc
-Meta
 dev/
