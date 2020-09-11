@@ -31,18 +31,12 @@
 #' pnorm(y, mean = x^2, sd = 1) #true probability
 #'
 #' @export
-F_n <- function(X, Y, y, x, h_n = NULL, k = NULL){
+F_n <- function(X, Y, y, x, h_n = NULL){
   q <- NCOL(x)
   X <- as.data.frame(X)
 
-  if (!is.null(k)){
-    X <- X[-k, , drop = FALSE]
-    Y <- Y[-k]
-    n <- n-1
-  }
-
   if (is.null(h_n)){
-    h_n <- hopt(X = X, Y = Y, n_tilde = 100)$h
+    h_n <- hopt(X = X, Y = Y)$h
   }
 
   d = sweep(
