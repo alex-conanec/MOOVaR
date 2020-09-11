@@ -56,9 +56,6 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         set.seed(seed)
     }
 
-    if (! crossing_type %in% c("hybrid", "auto"))
-        stop("crossing_type must be either 'hybrid' or 'auto'")
-
     if (missing(N)) N <- round(NROW(X) / 2, 0)
 
     sens <- sapply(ff, function(f){
@@ -89,16 +86,8 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
 
         # 2) Select the best indivdu base (Pt) on the domination notion
         Y$rank = dominance_ranking(Y[,-NCOL(Y)], sens)
-
-        if (NCOL(Y) > 3){
-
-            Y = crowding_distance(Y)
-            Y = Y %>% arrange(rank, desc(crowding_distance)) %>% head(N)
-
-        }else{
-            Y <- head(Y, N) %>% mutate(crowding_distance = runif(NROW(.)))
-        }
-
+        Y = crowding_distance(Y)
+        Y = Y %>% arrange(rank, desc(crowding_distance)) %>% head(N)
 
         Pt <- X[Y$id,]
 
@@ -122,12 +111,8 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         }
     }
 
-    if (length(ff) > 1){
-        Y <- Y[,seq_along(ff)]
-        colnames(Y) <- names(ff)
-    }else{
-        Y <- Y[,1]
-    }
-
-    list(Pt = Pt, Y = Y)
+    Y <- Y[,seq_along(ff)]
+    colnames(Y) <- names(ff)
+    rownames(Pt) <- seq_len(NROW(Pt))
+    list(X = Pt, Y = Y)
 }
