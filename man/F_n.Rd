@@ -4,7 +4,7 @@
 \alias{F_n}
 \title{Cumulative distribution function (cdf)}
 \usage{
-F_n(X, Y, y, x, h_n = NULL, k = NULL)
+F_n(X, Y, y, x, h_n = NULL)
 }
 \arguments{
 \item{X}{a numerical vector, matrix, or data.frame of explanatory variables of dimension nxq}

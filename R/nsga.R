@@ -27,30 +27,28 @@
 #' maxi <- rep(x = 2, times = q)
 #'
 #' X <- lapply(seq_len(q), function(k){
-#'     res <- data.frame(X=runif(n = n, min = mini[k], max = maxi[k]))
-#'     names(res) <- paste0("X", k)
-#'     res
+#'   res <- data.frame(X=runif(n = n, min = mini[k], max = maxi[k]))
+#'   names(res) <- paste0("X", k)
+#'   res
 #' }) %>% bind_cols()
 #'
 #' ff <- list(
-#'     list(f = function(X) unlist(X[1] + 2*X[2] + X[3]),
-#'          sens = "min"),
-#'     list(f = function(X) unlist(-X[1] - X[2] - 3*X[3]),
-#'          sens = 'min')
+#'   Y1 = list(f = function(X) unlist(X[1] + 2*X[2] + X[3]),
+#'             sens = "min"),
+#'   Y2 = list(f = function(X) unlist(-X[1] - X[2] - 3*X[3]),
+#'             sens = 'min')
 #' )
 #'
-#' library(NSGA2)
-#' NSGA(X=X[1:50,], ff, N = 50, crossing_over_size = 2, freq_mutation = rep(0.3, q),
-#'     seed = 123, constraints = NULL, B=50, crossing_type = "hybrid",
-#'     verbose = TRUE, time_out = 5)
+#' res = NSGA(X=X[1:50,], ff, N = 50, crossing_over_size = 2, freq_mutation = rep(0.3, q),
+#'            seed = 123, B=50, verbose = TRUE)
 #'
+#' plot(res$Y %>% arrange(Y1), type = 'b')
+#' @importFrom magrittr %>%
+#' @import dplyr
 #' @export
 
 NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
                  B=500, verbose = TRUE){
-
-    require(dplyr)
-    require(magrittr)
 
     if (!missing(seed)){
         set.seed(seed)
@@ -75,7 +73,7 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
     for (b in seq_len(B)){
 
         # 1) Evaluation of the performances of each individu for each objectif function
-        Y <- sapply(1:length(ff), function(j){
+        Y <- sapply(seq_along(ff), function(j){
 
             if (class(ff[[j]]$f) == "function"){
                 ff[[j]]$f(X)

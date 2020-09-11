@@ -12,11 +12,11 @@
 #'
 #' @examples
 #' sum(1:10)
+#' @importFrom magrittr %>%
 #' @export
 
 dominance_ranking <- function(X, sens){
 
-    require(dplyr)
     res <- rep(NA, NROW(X))
     rank <- 1
     PwCp <- pairwise_comparison(X, sens)
@@ -41,36 +41,3 @@ dominance_ranking <- function(X, sens){
     }
     res
 }
-
-
-# dominance_ranking <- function(X, sens){
-#
-#     res <- rep(NA, NROW(X))
-#     rank <- 1
-#     last_points <- 1:length(PwCp)
-#     PwCp <- pairwise_comparison(X, sens)
-#
-#     while (any(is.na(res))){
-#         temp <- NULL
-#         for (i in last_points){
-#             if (PwCp[[i]]$dominated_count == 0){
-#                 temp <- c(temp, i)
-#             }
-#         }
-#
-#         res[temp] <- rank
-#
-#         for (j in temp){
-#             for (k in PwCp[[j]]$dominating_index){
-#                 PwCp[[k]]$dominated_count <- PwCp[[k]]$dominated_count - 1
-#             }
-#         }
-#
-#         rank <- rank + 1
-#         last_points <- last_points[!last_points %in% temp]
-#     }
-#     res
-# }
-
-
-
