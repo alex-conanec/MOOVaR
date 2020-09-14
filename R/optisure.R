@@ -102,14 +102,16 @@ optisure <- function(X, Y, sens, alpha = 0.5){
           X_combi = X[mask,]
 
           #calcul le quantile pour chaque combinaison
-          data.frame(
-            y = sapply(seq_along(mask), function(i){ #faudrait vectoriser ca mais le point bloquant c'est l'inversion avec optimize...
-              conditionnal_quantile(X = train_datas[[q]]$X_num,
-              Y = train_datas[[q]]$Y[,j], x = X_combi[i, !is_fac], alpha,
-              h_n = all_h[[p]][[q]])
-            }),
-            id = mask
-          )
+          if (NROW(X_combi) > 0){
+            data.frame(
+              y = conditionnal_quantile(X = train_datas[[q]]$X_num,
+                                        Y = train_datas[[q]]$Y[,j],
+                                        x = X_combi[, !is_fac],
+                                        alpha,
+                                        h_n = all_h[[p]][[q]])$y,
+              id = mask
+            )
+          }else NULL
         }) %>% bind_rows() %>% arrange(id) %>% pull(y)
       },
       sens = sens[j]
@@ -125,6 +127,4 @@ optisure <- function(X, Y, sens, alpha = 0.5){
   #mise en forme des resultats
   res
 
-  # plot(res$Y)
 }
-

@@ -4,7 +4,8 @@
 \alias{conditionnal_quantile}
 \title{conditionnal_quantile}
 \usage{
-conditionnal_quantile(X, Y, x, alpha, h_n = NULL)
+conditionnal_quantile(X, Y, x, alpha, h_n = NULL, iter_max = 15,
+  tol = 0.001)
 }
 \arguments{
 \item{X}{a numerical vector, matrix, or data.frame of explanatory variables  of dimension nxq}
@@ -17,6 +18,11 @@ conditionnal_quantile(X, Y, x, alpha, h_n = NULL)
 
 \item{h_n}{the mobile windows size use to smooth the distribution function.
 The parameter is tuned if NULL (default value).}
+
+\item{iter_max}{the maximum iteration allowed to find the root and inverse the CDF.
+15 by default.}
+
+\item{tol}{the tolerance threshold below which the convergence is reached. 0.001 by default.}
 }
 \value{
 the value of the conditional quantile
@@ -34,24 +40,62 @@ Y <- X^2 + rnorm(n)
 
 #parametres
 alpha <- 0.1
-h_n <- 0.2
+h_n <- hopt(X, Y)$h
 
 #estimation de q_n et calcul de q
-x_range <- seq(-2, 2, length.out = n/2)
+x_range <- seq(-2, 2, length.out = n/3)
 
-parallel::mclapply(x_range, function(x){
-  q <- qnorm(p = alpha, mean = x^2, sd = 1)
-  q_n <- conditionnal_quantile(X, Y, x, alpha, h_n = h_n)
-  data.frame(q=q, q_n=q_n)
-}, mc.cores = 8) \%>\% bind_rows()-> res
+res = conditionnal_quantile_2(X, Y, x=x_range, alpha, h_n = h_n,
+                              iter_max = 15, tol = 0.01)
+
+data = data.frame(
+  x = x_range,
+  q = qnorm(p = alpha, mean = x_range^2, sd = 1),
+  q_n = res$y,
+  X,
+  Y
+) \%>\% gather(key = key, value = value, -x, -X, -Y)
 
 #plot
-res <- cbind(x_range = x_range, res) \%>\%
-  gather(key = key, value = value, -x_range)
-data <- cbind(data.frame(X=X, Y=Y), res)
-
 ggplot(data) +
   geom_point(aes(x=X, y=Y)) +
-  geom_line(aes(x=x_range, y=value, col = key))
+  geom_line(aes(x=x, y=value, col = key))
+
+#ecart absolu a 0 dans la recherche de la racine
+boxplot(abs(res$`f(y)`))
+
+#nombre d'iteration necessaire pour converger
+ggplot(res) + geom_bar(aes(iter))
+
+
+#q=3
+set.seed(123)
+q = 3
+mini <- rep(x = -2, times = q)
+maxi <- rep(x = 2, times = q)
+
+X <- lapply(seq_len(q), function(k){
+  res <- data.frame(X=runif(n = n, min = mini[k], max = maxi[k]))
+  names(res) <- paste0("X", k)
+  res
+}) \%>\% bind_cols() \%>\% as.matrix()
+
+beta = runif(3)
+Y = X \%*\% beta + rnorm(NROW(X))
+
+h_n = hopt(X, Y)$h
+res = conditionnal_quantile_2(X, Y, x=X[1:20,], alpha, h_n = h_n,
+                              iter_max = 15, tol = 0.01)
+
+x_q = 1 #jouer avec le q ici pour changer de coupe dans la dimension
+plot(X[,x_q], Y)
+
+points(data.frame(x = X[1:20, x_q], y = qnorm(alpha, mean = X[1:20,] \%*\% beta)) \%>\%
+         arrange(x), type = "b", col = "red")
+points(data.frame(x = X[1:20, x_q], y = res$y) \%>\%
+         arrange(x), type = "b", col = "blue")
+
+
+boxplot(res$y - qnorm(alpha, mean = X[1:20,] \%*\% beta))
 
 }

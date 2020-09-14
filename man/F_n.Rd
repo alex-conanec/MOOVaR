@@ -17,9 +17,6 @@ lower or equal to the random variable Y knowing that X=x}
 \item{x}{the conditional value of the random variable X}
 
 \item{h_n}{the mobile windows size use to smooth the distribution function.}
-
-\item{k}{a positive integer lower than n to exclude observation from the training set in
-order to perform cross-validation. NULL by default.}
 }
 \value{
 P(Y<=y|X=x)
@@ -37,7 +34,7 @@ X <- runif(n = n, min = -2, max = 2)
 Y <- X^2 + rnorm(n)
 
 #parametres
-h_n <- 0.2
+h_n <- hopt(X, Y)$h
 
 #estimation
 F_n(X = X, Y = Y, x = x, y = y, h_n = h_n)
