@@ -31,9 +31,83 @@ test_that("un point ne peut etre domine par un point qu'il domine", {
 
     comp <- pairwise_comparison(X, sens = rep("min", p))
 
-    lapply(seq_along(comp), function(i){
-        lapply(comp[[i]]$dominating_index, function(index){
-            expect_false(i %in% comp[[index]]$dominating_index)
-        })
-    })
+    for (i in seq_along(comp)){
+      for (index in comp[[i]]$dominating_index){
+        expect_false(i %in% comp[[index]]$dominating_index)
+      }
+    }
+
+})
+
+test_that("pairwise_comparaison behave well with two type examples of 5 points", {
+
+  #double max
+  p <- 2
+  X <- matrix(c(0, 0,
+                1, 1,
+                1, 2,
+                0, 2,
+                -1, 0.1), ncol = p, byrow = T)
+
+  comp <- pairwise_comparison(X, sens = rep("max", p))
+
+  true_comp = list(
+    list(
+      dominating_index = integer(0),
+      dominated_count = 3 #c(2, 3, 4)
+    ),
+    list(
+      dominating_index = c(1, 5),
+      dominated_count = 1 #3
+    ),
+    list(
+      dominating_index = c(1, 2, 4, 5),
+      dominated_count = 0
+    ),
+    list(
+      dominating_index = c(1, 5),
+      dominated_count = 1 #3
+    ),
+    list(
+      dominating_index = integer(0),
+      dominated_count = 3 #c(2, 3, 4)
+    )
+  )
+
+  for (i in length(true_comp)){
+    expect_equal(true_comp[[i]]$dominated_count, comp[[i]]$dominated_count)
+    expect_equal(true_comp[[i]]$dominated_index, comp[[i]]$dominated_index)
+  }
+
+  #mixte max/min
+  comp <- pairwise_comparison(X, sens = c("max", "min"))
+
+  true_comp = list(
+    list(
+      dominating_index = 4:5,
+      dominated_count = 0
+    ),
+    list(
+      dominating_index = c(3, 4),
+      dominated_count = 0
+    ),
+    list(
+      dominating_index = 4,
+      dominated_count = 2 #c(1, 2)
+    ),
+    list(
+      dominating_index = integer(0),
+      dominated_count = 3 #1:3
+    ),
+    list(
+      dominating_index = integer(0),
+      dominated_count = 1 #1
+    )
+  )
+
+  for (i in length(true_comp)){
+    expect_equal(true_comp[[i]]$dominated_count, comp[[i]]$dominated_count)
+    expect_equal(true_comp[[i]]$dominated_index, comp[[i]]$dominated_index)
+  }
+
 })

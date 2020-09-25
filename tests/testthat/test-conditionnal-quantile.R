@@ -1,103 +1,70 @@
 library(dplyr)
 test_that("give the right quantile conditionnal estimation for dim(Y)=1", {
 
+  #test q = 1
   n <- 300
   X <- runif(n = n, min = -2, max = 2)
   Y <- X^2 + rnorm(n)
 
-  sapply(seq_len(100), function(i){
-    alpha <- runif(1, min=0, max=1)
-    x <- runif(n = 1, min = -2, max = 2)
+  #parametres
+  h_n <- hopt(X, Y)$h
 
-    q_hat <- conditionnal_quantile(X, Y, x, alpha)
-    q_true <- qnorm(p = alpha, mean = x^2, sd = 1)
+  N = 100
+  x_range <- runif(n = N, min = -2, max = 2)
+  alpha_range = runif(n = N, min = 0.01, max = 0.99)
+  q_n = conditionnal_quantile(X, Y, x = x_range,
+                              alpha=alpha_range,
+                              # alpha=0.05,
+                              h_n = h_n,
+                              iter_max = 15, tol = 0.01)$y
+  q_true = qnorm(alpha_range, mean = x_range^2, sd = 1)
 
-    (q_hat - q_true)^2
-  }) %>% mean() %>% sqrt()-> MSE
-
-  MSE
-  plot(X, Y)
-  abline(v=x, col = "red")
-  abline(h=q_hat, col = "blue")
-  abline(h=q_true, col = "green")
-
-  MSE_ref <- 0.5
-  expect_true(MSE < MSE_ref)
-
-})
+  expect_that(t.test(q_n, q_true, paired = T)$p.value, is_more_than(0.05))
 
 
-test_that("the quantile estimation converge to the true quantile when n tend to +inf", {
+  #test q = 2
+  set.seed(12) #123 NS diff #12 p.value=0.001
+  n <- 300
+  X <- data.frame(X1 = runif(n = n, min = -2, max = 2),
+                  X2 = runif(n = n, min = -2, max = 2))
 
-  n_range <- c(50, 100, 150, 200, 300, 450, 600, 800, 1000, 1500, 2200, 3000)
+  Y <- rowSums(X^2) + rnorm(n)
 
-  sapply(n_range, function(n){
-    X <- runif(n = n, min = -2, max = 2)
-    Y <- X^2 + rnorm(n)
+  x_range <- matrix(runif(n = 2*N, min = -2, max = 2), ncol = 2)
+  alpha_range = runif(n = N, min = 0.01, max = 0.99)
+  h_n <- hopt(X, Y)$h
 
-    parallel::mclapply(seq_len(80), function(i){
-      alpha <- 0.2
-      x <- runif(n = 1, min = -2, max = 2)
-
-      q_hat <- conditionnal_quantile(X, Y, x, alpha, h_n = 0.1)
-      q_true <- qnorm(p = alpha, mean = x^2, sd = 1)
-
-      (q_hat - q_true)^2
-    }, mc.cores = 8) %>% unlist() %>% mean() %>% sqrt()
-
-  }) -> MSE
-
-  plot(x=n_range, y=MSE, type = 'l')
-
-  expect_true(MSE < MSE_ref)
-
-})
+  q_n = conditionnal_quantile(X, Y, x = x_range,
+                              alpha = alpha_range,
+                              h_n = h_n,
+                              iter_max = 15, tol = 0.01)$y
+  q_true = qnorm(alpha_range, mean = rowSums(x_range^2), sd = 1)
 
 
-test_that("the quantile estimation converge to the true quantile when n tend to +inf", {
+  expect_that(t.test(q_n, q_true, paired = T)$p.value, is_more_than(0.05))
 
-  n_range <- c(50, 100, 150, 200, 300, 450, 600, 800, 1000, 1500, 3000)
 
-  sapply(n_range, function(n){
-    X <- data.frame(x1 = runif(n = n, min = -2, max = 2),
-                    x2 = runif(n = n, min = -2, max = 2))
-    Y <- X$x1 + X$x2 + rnorm(n)
-
-    parallel::mclapply(seq_len(80), function(i){
-      alpha <- 0.1
-      x <- runif(n = 1, min = -2, max = 2)
-
-      q_hat <- conditionnal_quantile(X, Y, x, alpha)
-      q_true <- qnorm(p = alpha, mean = x$x1 + x$x2, sd = 1)
-
-      (q_hat - q_true)^2
-    }, mc.cores = 8) %>% unlist() %>% mean() %>% sqrt()
-
-  }) -> MSE
-
-  plot(x=n_range, y=MSE, type = 'l')
-
-  expect_true(MSE < MSE_ref)
+  # data.frame(
+  #   id = 1:length(q_true),
+  #   q_n,
+  #   q_true
+  # ) %>%
+  #   gather(key = type, value=value, -id) %>%
+  #   mutate(id = as.factor(id)) %>%
+  #   ggplot(aes(x=id, y=value)) +
+  #   geom_point(aes(colour = type))+
+  #   geom_line(arrow = arrow(length=unit(0.30,"cm"), ends="first", type = "closed"))
+  #
+  #
+  # data.frame(
+  #   id = 1:length(q_true),
+  #   q_n,
+  #   q_true
+  # ) %>%
+  #   mutate(diff = q_true - q_n) %>%
+  #   ggplot(aes(x = q_true, y = diff)) +
+  #   geom_point()
+  #
 
 })
 
-
-test_that("give the right quantile conditionnal estimation for dim(Y)>1", {
-
-  n=10000
-  X <- data.frame(x1 = runif(n = n, min = -2, max = 2),
-                  x2 = runif(n = n, min = -2, max = 2))
-  Y <- X$x1 + X$x2 + rnorm(n)
-
-  sapply(seq_len(100), function(i){
-    alpha <- 0.1
-    x <- c(x1 = runif(n = 1, min = -2, max = 2),
-           x2 = runif(n = 1, min = -2, max = 2))
-
-    q_hat <- conditionnal_quantile(X, Y, x, alpha)
-    q_true <- qnorm(p = alpha, mean = x$x1 + x$x2, sd = 1)
-
-    (q_hat - q_true)^2
-  }) %>% mean() %>% sqrt()-> MSE
-
-})
