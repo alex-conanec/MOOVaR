@@ -19,27 +19,31 @@
 pairwise_comparison <- function(X, sens){
 
     if (any(!sens %in% c("min", "max"))) stop("sens must be either 'min' or 'max'")
-    dom_sens <- sens
-    dom_sens[which(sens == "min")] <- '<'
-    dom_sens[which(sens == "max")] <- '>'
 
-    if (class(X) == "numeric") X <- data.frame(X)
+    A = array(as.matrix(X), dim = c(NROW(X), NCOL(X), NROW(X)))
+    A_T = apply(A, c(3,1), t)
+    B = apply(A, c(2,1,3), function(x) x)
+    m = B - A_T
 
-    b = lapply(seq_len(NCOL(X)), function(j){
 
-        A = matrix(X[,j], nrow = NROW(X), ncol = NROW(X), byrow = F)
-        outer(A - t(A), 0, dom_sens[j])
+    min_dom_strict = apply((m < 0)[which(sens == "min"),, ,drop = FALSE], 2:3, any)
+    min_dom_eq = apply((m <= 0)[which(sens == "min"),, ,drop = FALSE], 2:3, all)
 
-    })
+    max_dom_strict = apply((m > 0)[which(sens == "max"),, ,drop = FALSE], 2:3, any)
+    max_dom_eq = apply((m >= 0)[which(sens == "max"),, ,drop = FALSE], 2:3, all)
 
-    m = array(unlist(b), dim = c(NROW(X), NROW(X), NCOL(X)))
-
-    domination = apply(m, 1:2, all)
+    if (all(sens == "min")){
+      dom = min_dom_strict & min_dom_eq
+    }else if (all(sens == "max")){
+      dom = max_dom_strict & max_dom_eq
+    }else{
+      dom = (min_dom_strict | max_dom_strict) & max_dom_eq & min_dom_eq
+    }
 
     lapply(seq_len(NROW(X)), function(i){
         list(
-            dominating_index = which(domination[i,]),
-            dominated_count = length(which(domination[,i]))
+            dominating_index = which(dom[i,]),
+            dominated_count = length(which(dom[,i]))
             )
     })
 
