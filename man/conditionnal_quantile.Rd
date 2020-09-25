@@ -45,7 +45,7 @@ h_n <- hopt(X, Y)$h
 #estimation de q_n et calcul de q
 x_range <- seq(-2, 2, length.out = n/3)
 
-res = conditionnal_quantile_2(X, Y, x=x_range, alpha, h_n = h_n,
+res = conditionnal_quantile(X, Y, x=x_range, alpha, h_n = h_n,
                               iter_max = 15, tol = 0.01)
 
 data = data.frame(
