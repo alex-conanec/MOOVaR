@@ -20,7 +20,7 @@
 #'
 #' @examples
 #' library(tidyverse)
-#' set.seed(123)
+#' set.seed(1234)
 #' n <- 300
 #' q = 3
 #' mini <- rep(x = -2, times = q)
@@ -32,33 +32,27 @@
 #'   res
 #' }) %>% bind_cols()
 #'
-#' ff <- list(
-#'   Y1 = list(f = function(X) unlist(X[1] + 2*X[2] + X[3]),
-#'             sens = "min"),
-#'   Y2 = list(f = function(X) unlist(-X[1] - X[2] - 3*X[3]),
-#'             sens = 'min')
+#' fn <- list(
+#'   Y1 = function(X) unlist(X[1] + 2*X[2] + X[3]),
+#'   Y2 = function(X) unlist(-X[1] - X[2] - 3*X[3])
 #' )
 #'
-#' res = NSGA(X=X[1:50,], ff, N = 50, crossing_over_size = 2, freq_mutation = rep(0.3, q),
-#'            seed = 123, B=50, verbose = TRUE)
+#' res = NSGA(X = X, fn, N=50)
+#' plot(res$Y)
 #'
-#' plot(res$Y %>% arrange(Y1), type = 'b')
+#' res = NSGA(X = X, fn, N=50, sens = rep("max", length(fn)))
+#' plot(res$Y)
+#'
 #' @importFrom magrittr %>%
 #' @import dplyr
 #' @export
 
-NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
-                 B=500, verbose = TRUE){
+NSGA <- function(X, fn, sens = rep("min", length(fn)), N = round(NROW(X) / 2, 0),
+                 crossing_over_size = round(NCOL(X)/2),
+                 freq_mutation=rep(1/NCOL(X), NCOL(X)),
+                 seed = NULL, B=50, verbose = TRUE){
 
-    if (!missing(seed)){
-        set.seed(seed)
-    }
-
-    if (missing(N)) N <- round(NROW(X) / 2, 0)
-
-    sens <- sapply(ff, function(f){
-        f$sens
-    })
+    if (!is.null(seed)) set.seed(seed)
 
     distri_Xi <- lapply(X, function(x){
         if (class(x) == "numeric"){
@@ -72,20 +66,20 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
     time_deb <- Sys.time()
     for (b in seq_len(B)){
 
-        # 1) Evaluation of the performances of each individu for each objectif function
-        Y <- sapply(seq_along(ff), function(j){
-
-            if (class(ff[[j]]$f) == "function"){
-                ff[[j]]$f(X)
-            }else{
-                predict(ff[[j]]$f, newdata = X)
-            }
+        Y <- sapply(fn, function(f){
+          if (class(f) == "function"){
+            f(X)
+          }else{
+            predict(f, newdata = X)
+          }
         }) %>% as.data.frame() %>% mutate(id = 1:NROW(.))
 
         # 2) Select the best indivdu base (Pt) on the domination notion
         Y$rank = dominance_ranking(Y[,-NCOL(Y)], sens)
         Y = crowding_distance(Y)
-        Y = Y %>% arrange(rank, desc(crowding_distance)) %>% head(N)
+        Y = Y %>% arrange(rank, desc(crowding_distance)) %>%
+          filter(crowding_distance != 0) %>%
+          head(N)
 
         Pt <- X[Y$id,]
 
@@ -109,8 +103,18 @@ NSGA <- function(X, ff, N, crossing_over_size, freq_mutation, seed,
         }
     }
 
-    Y <- Y[,seq_along(ff)]
-    colnames(Y) <- names(ff)
+    #if crowding distance parameter thing
+    no_domi = Y$rank == 1
+    Y <- Y[no_domi, seq_along(fn)]
+    Pt = Pt[no_domi,]
+
+    #tri
+    Y = Y %>% mutate(id = as.factor(1:NROW(Y))) %>% arrange_all()
+    Pt = Pt[Y$id,]
+    Y = Y %>% select(-id)
+
+    # Y <- Y[, seq_along(fn)] #a remettre si crowding distance thing est supprime finalement.
+    colnames(Y) <- names(fn)
     rownames(Pt) <- seq_len(NROW(Pt))
-    list(X = Pt, Y = Y)
+    list(X = Pt, Y = Y, time = Sys.time() - time_deb)
 }

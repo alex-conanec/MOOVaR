@@ -4,14 +4,12 @@
 \alias{NSGA}
 \title{NSGA II algorithm}
 \usage{
-NSGA(X, ff, N, crossing_over_size, freq_mutation, seed, B = 500,
-  verbose = TRUE)
+NSGA(X, fn, sens = rep("min", length(fn)), N = round(NROW(X)/2, 0),
+  crossing_over_size = round(NCOL(X)/2), freq_mutation = rep(1/NCOL(X),
+  NCOL(X)), seed = NULL, B = 50, verbose = TRUE)
 }
 \arguments{
 \item{X}{a matrix/data.frame of an initial population}
-
-\item{ff}{a list of list containing the function or predicting model and
-if the objectif function should be maximise "max" or minimize "min"}
 
 \item{N}{the size of the population P before the generation of individus.
 By default N=NROW(X)/2}
@@ -21,6 +19,9 @@ crossing over}
 
 \item{freq_mutation}{a vector of numerics value varying from 0 to 1 which
 represent the frequency of mutation of each variable}
+
+\item{ff}{a list of list containing the function or predicting model and
+if the objectif function should be maximise "max" or minimize "min"}
 }
 \value{
 a vecteur of rank associated with the individus of X
@@ -30,7 +31,7 @@ The non sorting genetic algorithm is finding the Pareto front
 }
 \examples{
 library(tidyverse)
-set.seed(123)
+set.seed(1234)
 n <- 300
 q = 3
 mini <- rep(x = -2, times = q)
@@ -42,15 +43,15 @@ X <- lapply(seq_len(q), function(k){
   res
 }) \%>\% bind_cols()
 
-ff <- list(
-  Y1 = list(f = function(X) unlist(X[1] + 2*X[2] + X[3]),
-            sens = "min"),
-  Y2 = list(f = function(X) unlist(-X[1] - X[2] - 3*X[3]),
-            sens = 'min')
+fn <- list(
+  Y1 = function(X) unlist(X[1] + 2*X[2] + X[3]),
+  Y2 = function(X) unlist(-X[1] - X[2] - 3*X[3])
 )
 
-res = NSGA(X=X[1:50,], ff, N = 50, crossing_over_size = 2, freq_mutation = rep(0.3, q),
-           seed = 123, B=50, verbose = TRUE)
+res = NSGA(X = X, fn, N=50)
+plot(res$Y)
 
-plot(res$Y \%>\% arrange(Y1), type = 'b')
+res = NSGA(X = X, fn, N=50, sens = rep("max", length(fn)))
+plot(res$Y)
+
 }
