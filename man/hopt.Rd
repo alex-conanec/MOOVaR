@@ -4,8 +4,7 @@
 \alias{hopt}
 \title{mobile windows h tuning}
 \usage{
-hopt(X, Y, h0 = rep(0.5, NCOL(X)), lower = rep(0.01, NCOL(X)),
-  upper = rep(2, NCOL(X)))
+hopt(X, Y, h0 = NULL, lower = NULL, upper = NULL)
 }
 \arguments{
 \item{X}{a numerical vector, matrix, or data.frame of explanatory variables of dimension nxq.}

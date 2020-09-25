@@ -62,11 +62,15 @@
 #'
 #' @export
 
-hopt <- function(X, Y, h0 = rep(0.5, NCOL(X)), lower = rep(0.01, NCOL(X)),
-                 upper = rep(2, NCOL(X))){
+hopt <- function(X, Y, h0 = NULL, lower = NULL, upper = NULL){
 
   X <- as.data.frame(X)
   q <- NCOL(X)
+
+  width = apply(X, 2, max) - apply(X, 2, min)
+  if (is.null(h0)) h0 = width/10
+  if (is.null(upper)) upper = width
+  if (is.null(lower)) lower = width/200
 
   critere_hopt = function(h, Xo, Yo){
 
@@ -102,6 +106,8 @@ hopt <- function(X, Y, h0 = rep(0.5, NCOL(X)), lower = rep(0.01, NCOL(X)),
 
   if (q > 1){
     res <- optim(par = h0, fn = critere_hopt)
+    # res <- optim(par = h0, fn = critere_hopt, lower = lower, upper = upper,
+    #              method = "L-BFGS-B" )
     list(h = res$par, min_criteria = res$value)
 
   }else{
@@ -109,3 +115,4 @@ hopt <- function(X, Y, h0 = rep(0.5, NCOL(X)), lower = rep(0.01, NCOL(X)),
     list(h = res$minimum, min_criteria = res$objective)
   }
 }
+
