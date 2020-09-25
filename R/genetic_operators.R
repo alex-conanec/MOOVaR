@@ -15,13 +15,25 @@
 
 crossing_over <- function(X, parents, crossing_over_size){
 
-    c1 = 1:crossing_over_size
-    c2 = (crossing_over_size+1):NCOL(X)
+    # c1 = 1:crossing_over_size
+    # c2 = (crossing_over_size+1):NCOL(X)
+    #
+    # rbind(
+    #     cbind(X[parents[,1], c1, drop = FALSE], X[parents[,2], c2, drop = FALSE]),
+    #     cbind(X[parents[,1], c2, drop = FALSE], X[parents[,2], c1, drop = FALSE])
+    # )
 
-    rbind(
-        cbind(X[parents[,1], c1, drop = FALSE], X[parents[,2], c2, drop = FALSE]),
-        cbind(X[parents[,1], c2, drop = FALSE], X[parents[,2], c1, drop = FALSE])
-    )
+    q = NCOL(X)
+    n = NROW(parents)
+
+    lapply(seq_len(n), function(i){
+      c1 = sample(seq_len(NCOL(X)), size = crossing_over_size, replace = FALSE)
+      c2 = seq_len(NCOL(X))[-c1]
+      rbind(
+        cbind(X[parents[i, 1], c1, drop = F], X[parents[i, 2], c2, drop = F]),
+        cbind(X[parents[i, 1], c2, drop = F], X[parents[i, 2], c1, drop = F])
+      )
+    }) %>% bind_rows()
 
 }
 
@@ -51,26 +63,29 @@ mutation <- function(Qt, freq, distri_Xi, distribution = "uniform"){
                                 each variable")
 
     for (j in seq_len(NCOL(Qt))){
-        i <- sample(seq_len(NROW(Qt)), size = ceiling(NROW(Qt)*freq[j]))
-        var <- names(Qt)[j]
-        if (class(Qt[1,j]) == "numeric"){
+        occurence = unlist(ceiling(NROW(Qt)*freq[j]))
+        if (occurence > 1){
+          i <- sample(seq_len(NROW(Qt)), size = occurence)
+          var <- names(Qt)[j]
+          if (class(Qt[1,j]) == "numeric"){
             if (distribution=="uniform"){
-                min_j <- distri_Xi[[var]]$min
-                max_j <- distri_Xi[[var]]$max
-                Qt[i, j] <- runif(length(i), min = min_j, max = max_j)
+              min_j <- distri_Xi[[var]]$min
+              max_j <- distri_Xi[[var]]$max
+              Qt[i, j] <- runif(length(i), min = min_j, max = max_j)
             }else if (distribution=="normal"){
-                mean_j <- distri_Xi[[var]]$mean
-                sd_j <- distri_Xi[[var]]$sd
-                Qt[i, j] <- rnorm(length(i), mean = mean_j, sd = sd_j)
+              mean_j <- distri_Xi[[var]]$mean
+              sd_j <- distri_Xi[[var]]$sd
+              Qt[i, j] <- rnorm(length(i), mean = mean_j, sd = sd_j)
             }else{
-                stop("Distribution must be either 'uniform' or 'normal'")
+              stop("Distribution must be either 'uniform' or 'normal'")
             }
-        }else if (class(Qt[1,j]) == "factor"){
+          }else if (class(Qt[1,j]) == "factor"){
             levels_j <- distri_Xi[[var]]$levels
             Qt[i, j] <- sample(x = levels_j,
                                size = length(i),
                                replace = TRUE)
-        }
+          }
+      }
     }
     Qt
 }
