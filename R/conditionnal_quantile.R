@@ -30,7 +30,7 @@
 #' #estimation de q_n et calcul de q
 #' x_range <- seq(-2, 2, length.out = n/3)
 #'
-#' res = conditionnal_quantile_2(X, Y, x=x_range, alpha, h_n = h_n,
+#' res = conditionnal_quantile(X, Y, x=x_range, alpha, h_n = h_n,
 #'                               iter_max = 15, tol = 0.01)
 #'
 #' data = data.frame(
@@ -91,12 +91,14 @@ conditionnal_quantile <- function(X, Y, x, alpha, h_n = NULL, iter_max = 15,
   ##bisection method
 
   # find the root of f
-  f <- function(y, x){
+  f <- function(y, x, alpha){
     alpha - F_n(X = X, Y = Y, x = x, y = y, h_n = h_n)
   }
 
   x = as.matrix(x)
   q = NROW(x)
+
+  if (q > 1 & length(alpha) == 1) alpha = rep(alpha, q)
 
   a = rep(max(Y), q)
   b = rep(min(Y), q)
@@ -109,7 +111,7 @@ conditionnal_quantile <- function(X, Y, x, alpha, h_n = NULL, iter_max = 15,
 
     c = (a+b)/2
 
-    f_c = f(y = c, x)
+    f_c = f(y = c, x, alpha)
 
     # tolerance
     done = abs(f_c) < tol
@@ -121,7 +123,7 @@ conditionnal_quantile <- function(X, Y, x, alpha, h_n = NULL, iter_max = 15,
 
     if (all(done)) break
 
-    a = a[!done]; b = b[!done]; c = c[!done]; x = x[!done,, drop = F]; f_c = f_c[!done]
+    a = a[!done]; b = b[!done]; c = c[!done]; x = x[!done,, drop = F]; f_c = f_c[!done]; alpha = alpha[!done]
 
     neg = sign(f_c) < 0
     pos = sign(f_c) > 0
