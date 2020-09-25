@@ -4,7 +4,8 @@
 \alias{optisure}
 \title{optisure}
 \usage{
-optisure(X, Y, sens, alpha = 0.5)
+optisure(X, Y, sens = rep("min", NCOL(Y)), alpha = 0.5, N = NULL,
+  B = NULL, seed = NULL)
 }
 \description{
 optisure
