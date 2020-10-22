@@ -12,12 +12,14 @@ LazyData: true
 Imports:
     dplyr,
     magrittr,
-    processx
+    processx,
+    tidyr,
+    plotly
 Suggests:
     knitr,
     rmarkdown,
     testthat,
     ggpubr,
     tidyr
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
 VignetteBuilder: knitr

@@ -15,7 +15,7 @@ a/several point(s) belong to the space where the points where observed
  @param m a vector of size d to indicate how many reference points create for each dimension.
 }
 \examples{
-#'library(tidyverse)
+library(tidyverse)
 
 #generate data ---
 #parameter of the data
@@ -25,6 +25,7 @@ d = 2 #dim de X
 mini = rep(0, d)
 maxi = rep(10, d)
 
+set.seed(123)
 
 #uniform
 X = sapply(seq_len(d), function(i){
@@ -45,17 +46,25 @@ X_c = sapply(seq_len(d), function(i){
 plot(X_c)
 
 #use function
-res = def_cstr_X_space(X_c)
+res = def_cstr_X_space(X_c)#check several points
 
 #plot reference points with two colors depending or their feasability
 plot(res$ref_points, pch=3, col = "orange")
 points(res$feasible_ref_points, pch=3, col = "blue")
+points(X_c)
 
-#check only one point
+#check the feasibility
+plot(res$ref_points, pch=3, col = "orange")
+points(res$feasible_ref_points, pch=3, col = "blue")
+
+#of only one point
 i=3
 points(X[i,1], X[i,2], col = c("red", "green")[as.numeric(res$g(X = X[i,])) + 1])
 
-#check several points
+#of several points
 points(X, col = c("red", "green")[as.numeric(res$g(X)) + 1])
+
+#visualize the combination of variable. Very useful when d > 2
+plot(res)
 
 }
