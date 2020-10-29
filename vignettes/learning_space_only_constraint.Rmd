@@ -1,0 +1,215 @@
+---
+title: "Contrainte vérifiant que la variable de décision appartient à l'espace d'apprentissage"
+author: "Alexandre Conanec"
+date: "10/26/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(optisure)
+```
+
+## Introduction
+
+En apprentissage supervisé classique, on modélise la relation entre des variables à prédire $\bf Y$ et des variables explicatives $\bf X$. Restons dans un cas général traitant des variables explicatives quantitatives et qualitatives :
+\begin{equation}
+\begin{array}{r@{}l}
+     & {\bf X} = ({\bf X}^{(1)}, {\bf X}^{(2)}) \\
+     & {\bf X}^{(1)} \in \mathbb{R}^{d_1}  \\
+     & {\bf X}^{(2)} \in \prod\limits_{j=1}^{d_2} \{1, \dots, m_j\},  
+\end{array}
+\end{equation}
+où $m_j$ est le nombre de modalité du facteur $j$.
+
+Pour le processus d'apprentissage, on dispose pour cela de $n$ observations $({\bf X}_i, {\bf Y}_i)$. Sans aucun indice expert le laissant présager, l'extrapolation du modèle de prédiction de $\bf Y$ en dehors de l'espace d'apprentissage de $\bf X$, noté $\mathcal{X}$, n'est pas toléré. Chaque nouvel input $\bf x$ passé au modèle de prédiction doit donc vérifier la contrainte suivante :
+
+\begin{align}
+               & {\bf x} \in \mathcal{X}, \label{contrainte_appartenance} \\ 
+    \text{où}~ & \mathcal{X} \subset \mathbb{R}^{d_1} \otimes \prod\limits_{j=1}^{d_2} \{1, \dots, m_j\} \label{espace_X_0}
+\end{align}
+
+Lorsque le nombre de variables explicatives est supérieur à 1, la définition de $\mathcal{X}$ se complexifie puisque le problème devient combinatoire. Vérifier (\ref{contrainte_appartenance}) par (\ref{espace_X_0}) n'est alors pas suffisant. Lorsque la taille de $\bf x$ augmente, il est de plus en plus difficile de vérifier (\ref{contrainte_appartenance}), notamment visuellement, et il devient alors utile de formuler la contrainte algébriquement. Cela est d'autant plus nécessaire lorsque le modèle de prédiction est utilisé de manière automatique, c'est-à-dire que c'est un algorithme qui décide du nouvel input $\bf x$ à prédire. L'approche développée dans ce document est de formaliser la contrainte (\ref{contrainte_appartenance}) de la manière suivante :
+
+\begin{align}
+    &\left\{
+        \begin{array}{ll}
+            \exists~ i ~|~ {\bf x}_j = {\bf X}^{(2)}_{ij}, ~\forall j \in \{1, \dots, d_2\} ~&\text{si}~ d_1 = 0 \\
+            \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf x}^{(1)} - {\bf X}^{(1)}_i) \geq \Gamma(\alpha) ~&\text{sinon si}~ |E| \geq N \\
+            0 ~&\text{sinon,}
+        \end{array}
+    \right. \\
+    \text{avec}~& E = \left\{
+        \begin{array}{ll}
+            \{i ~|~ {\bf x}^{(2)}_j = {\bf X}^{(2)}_{ij}, ~\forall~ j \in \{1, \dots, d_2'\} \}, ~&\text{si}~ d_2 > 0 \\
+            \{1, \dots, n\} ~&\text{sinon}
+        \end{array}
+    \right. \\
+    \text{et}~& \Gamma(\alpha) = \{q ~|~ P[Y \leq q] = \alpha\}, \\
+    \text{où}~& Y = \{ \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf X}^{(1)}_k - {\bf X}^{(1)}_i), ~\forall k \in E \}
+\end{align}
+
+
+où $|M|$ dénote la cardinalité de l'ensemble $M$, $K_H$ est un noyau multi-gaussien pondéré par une largeur de fenêtre mobile $H$ de dimension $d_1 \times d_1$, $N$ est le nombre minimum de points nécessaire à l'estimation de la densité et $\alpha$ est le risque d'affirmer que ${\bf x} \not\in \mathcal{X}$ alors que cela est vrai.   
+
+
+## Exemple avec $d_1$=2 et $d_2$=0
+
+```{r}
+#general parameters
+n = 1000
+d1 = 2
+alpha = 0.05
+
+mini = rep(0, d1)
+maxi = rep(10, d1)
+
+```
+
+### Distribution uniforme
+
+Génération de "deux foyers" de données, générer via une répartition uniforme.
+
+```{r}
+b = matrix(c(0, 0, 5, 5), byrow = T, ncol = d1)
+B = matrix(c(4, 4, 10, 10), byrow = T, ncol = d1)
+p = NROW(B) #nombre de "foyer"
+
+#aire theorique de 95% de la surface
+A_true_uni = (1-alpha) * sum(apply(B-b, 1, prod))
+A_true_uni
+
+#generate data
+X_U = sapply(seq_len(d1), function(i){
+  sapply(seq_len(p), function(k){
+    runif(n/p, b[k,i], B[k,i])
+  })
+}) %>% as.data.frame()
+
+#Monte Carlo simulation of 5000 points to check the constraint 
+n_MC = 5000
+A_MC = prod(maxi - mini)
+X_MC = sapply(seq_len(d1), function(i){
+  runif(n_MC, mini[i], maxi[i])
+})
+
+#visualisation
+res = def_cstr_X_space(X=X_U, alpha = alpha)
+feasible_X_MC = res$g(x = X_MC)
+
+cols <- c("FALSE" = "red", "training" = "blue", "TRUE" = "green")
+ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+  geom_point(aes(x = X1, y = X2, colour = feasible)) +
+  geom_point(data = X_U, aes(x = V1, y = V2, colour = "training"),
+             shape = 17, size = 1) +
+  scale_colour_manual(values = cols)
+
+
+#verification avec les aires de MC
+(A_MC*sum(feasible_X_MC)/n_MC - A_true_uni)/A_true_uni
+```
+
+### Distribution normale
+
+Génération de "deux foyers" de données, générer via une répartition normale
+
+```{r}
+mu = matrix(c(2, 2, 7, 7), byrow = T, ncol = d1)
+sig = matrix(c(1, 1, 1, 1), byrow = T, ncol = d1)
+p = NROW(sig) #nombre de "foyer"
+
+#aire theorique de 95% de la surface
+A_true_norm = sum(apply(sig, 1, function(x) pi*prod(qnorm(1-alpha/2, sd = x))))
+A_true_norm
+
+#generate data
+X_N = sapply(seq_len(d1), function(i){
+  sapply(seq_len(p), function(k){
+   rnorm(n/p, mu[k,i], sig[k,i])
+  })
+}) %>% as.data.frame()
+
+#Monte Carlo simulation of 5000 points to check the constraint
+mini = apply(X_N, 2, min) 
+maxi = apply(X_N, 2, max)
+n_MC = 5000
+A_MC = prod(maxi - mini)
+X_MC = sapply(seq_len(d1), function(i){
+  runif(n_MC, mini[i], maxi[i])
+})
+
+#visualisation
+res = def_cstr_X_space(X = X_N, alpha = alpha)
+feasible_X_MC = res$g(x = X_MC)
+
+ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+  geom_point(aes(x = X1, y = X2, colour = feasible)) +
+  geom_point(data = X_N, aes(x = V1, y = V2, colour = "training"),
+             shape = 17, size = 1) +
+  scale_colour_manual(values = cols)
+
+
+#verification avec les aires de MC
+(A_MC*sum(feasible_X_MC)/n_MC - A_true_norm)/A_true_norm #probleme ici# est ce que ça a un sens de faire une aire ici ??? 
+```
+
+## Exemple avec $d_1$=2 et $d_2$=3
+
+```{r}
+d2 = 3
+lev = rep(2, d2)
+X2 <- sapply(seq_len(d2), function(k){
+  as.factor(sample(x = LETTERS[seq_len(lev[k])], size = n, replace = TRUE))
+}) %>% as.data.frame()
+  
+X = data.frame(X1 = X_U, X2 = X2)
+res = def_cstr_X_space(X = X, alpha = alpha)
+
+#test visuel
+# A B A
+moda = c("A", "B", "A")  #changer jusqu'a 5
+X_f = X %>% filter(X2.V1 == moda[1] & X2.V2 == moda[2] & X2.V3 == moda[3])
+X_MF_f = data.frame(X_MC, X2.V1 = moda[1], X2.V2 = moda[2], X2.V3 = moda[3])
+feasible_X_MC = res$g(x = X_MF_f)
+
+ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+  geom_point(aes(x = X1, y = X2, colour = feasible)) +
+  geom_point(data = X_f, aes(x = X1.V1, y = X1.V2, colour = "training"),
+             shape = 17, size = 1) +
+  scale_colour_manual(values = cols)
+
+# A A A
+moda = c("A", "A", "A")  #changer jusqu'a 5
+X_f = X %>% filter(X2.V1 == moda[1] & X2.V2 == moda[2] & X2.V3 == moda[3])
+X_MF_f = data.frame(X_MC, X2.V1 = moda[1], X2.V2 = moda[2], X2.V3 = moda[3])
+feasible_X_MC = res$g(x = X_MF_f)
+
+ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+  geom_point(aes(x = X1, y = X2, colour = feasible)) +
+  geom_point(data = X_f, aes(x = X1.V1, y = X1.V2, colour = "training"),
+             shape = 17, size = 1) +
+  scale_colour_manual(values = cols)
+
+```
+
+## Exemple avec $d_1$=0 et $d_2$=3 
+
+```{r}
+  #avec uniquement quali
+  res = def_cstr_X_space(X = X2, alpha = alpha)
+  res$g(x = c("A", "B", "A")) # avec un vecteur
+  res$g(x = data.frame(V1="A", V2="B", V3="A")) # avec un data.frame
+  res$g(x = c("A", "B", "C")) #avec une solution infaisable (C n'existe pas comme modalite)
+```
+
+
+## Discussion
+
+Peut-on considérer qu'on a le droit de faire de l'extrapolation à partir du 
+moment où l'on a montré sur $\mathcal{X}$ qu'il n'y a pas d'interaction entre
+les variables pour prédire $\bf Y$
+

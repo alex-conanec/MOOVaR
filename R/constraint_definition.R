@@ -8,215 +8,247 @@
 #'
 #' @examples
 #' library(tidyverse)
+#' library(optisure)
 #'
-#' #generate data ---
-#' #parameter of the data
-#' n = 100
-#' d = 2 #dim de X
+#' #parameters constraint
+#' alpha = 0.05
 #'
-#' mini = rep(0, d)
-#' maxi = rep(10, d)
-#'
-#' set.seed(123)
-#'
-#' #uniform
-#' X = sapply(seq_len(d), function(i){
-#'   runif(n, mini[i], maxi[i])
-#' })
-#' plot(X)
-#'
-#' #avec des trous
-#' b = matrix(c(0, 0, 5, 5), byrow = T, ncol = d)
-#' B = matrix(c(4, 4, 10, 10), byrow = T, ncol = d)
+#' #parameters data
+#' n = 1000
+#' d1 = 2
+#' mini = rep(0, d1)
+#' maxi = rep(10, d1)
+#' b = matrix(c(0, 0, 5, 5), byrow = T, ncol = d1)
+#' B = matrix(c(4, 4, 10, 10), byrow = T, ncol = d1)
 #' p = NROW(B) #nombre de "foyer"
 #'
-#' X_c = sapply(seq_len(d), function(i){
+#'
+#' #generate data
+#' X_U = sapply(seq_len(d1), function(i){
 #'   sapply(seq_len(p), function(k){
 #'     runif(n/p, b[k,i], B[k,i])
 #'   })
+#' }) %>% as.data.frame()
+#'
+#' #Monte Carlo simulation of 5000 points to check the constraint
+#' n_MC = 5000
+#' X_MC = sapply(seq_len(d1), function(i){
+#'   runif(n_MC, mini[i], maxi[i])
 #' })
-#' plot(X_c)
 #'
-#' #use function
-#' res = def_cstr_X_space(X_c)#check several points
+#' #visualisation
+#' res = def_cstr_X_space(X=X_U, alpha = alpha)
+#' feasible_X_MC = res$g(x = X_MC)
 #'
-#' #plot reference points with two colors depending or their feasability
-#' plot(res$ref_points, pch=3, col = "orange")
-#' points(res$feasible_ref_points, pch=3, col = "blue")
-#' points(X_c)
+#' cols <- c("FALSE" = "red", "training" = "blue", "TRUE" = "green")
+#' ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+#'   geom_point(aes(x = X1, y = X2, colour = feasible)) +
+#'   geom_point(data = X_U, aes(x = V1, y = V2, colour = "training"),
+#'              shape = 17, size = 1) +
+#'   scale_colour_manual(values = cols)
 #'
-#' #check the feasibility
-#' plot(res$ref_points, pch=3, col = "orange")
-#' points(res$feasible_ref_points, pch=3, col = "blue")
 #'
-#' #of only one point
-#' i=3
-#' points(X[i,1], X[i,2], col = c("red", "green")[as.numeric(res$g(X = X[i,])) + 1])
+#' # verification avec les aires de MC
+#' # aire theorique de 95% de la surface
+#' A_true_uni = (1-alpha) * sum(apply(B-b, 1, prod))
+#' A_true_uni
 #'
-#' #of several points
-#' points(X, col = c("red", "green")[as.numeric(res$g(X)) + 1])
-#'
-#' #visualize the combination of variable. Very useful when d > 2
-#' plot(res)
+#' # Aire estime par Monte Carlo
+#' A_MC = prod(maxi - mini)
+#' A_estime = A_MC*sum(feasible_X_MC)/n_MC
+#' A_estime
+#' (A_estime - A_true_uni)/A_true_uni #ratio
 #'
 #' @export
 
-def_cstr_X_space <- function(X, m = rep(10, NCOL(X)) ){
+def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
 
+  is_fac = sapply(data.frame(X), is.factor)
+
+  d1 = sum(!is_fac)
+  d2 = sum(is_fac)
   n = NROW(X)
-  d = NCOL(X)
-  mini = floor(apply(X, 2, min))
-  maxi = ceiling(apply(X, 2, max))
-  h = (maxi - mini)/m
 
-  #all the combination possible (depending of m)
-  K = prod(m)
-  ref_points = matrix(unlist(purrr::cross(lapply(seq_len(d), function(j){
-    sapply(seq_len(m[j])-0.5, function(k){
-      mini[j] + k*h[j]
-    })
-  }))), ncol = d, byrow = T)
+  fit_density = function(X){
+    H = ks::Hpi(x=X)
+    fhat = ks::kde(x=X, H=H, eval.points = X)$estimate
+    threshold = quantile(fhat, probs = alpha)
 
-  #generate a XX and a AA to have a conformable dimension
-  XX = array(X, dim = c(n, d, K))
-  AA = array(ref_points, c(K, d, n)) %>%
-    apply(c(3, 2, 1), FUN = function(x) x)
-
-  #the points from which you have to be close to be in the feasible space
-  feasible_ref_points = apply(XX - AA, c(1,3), function(x) x[1]^2 + x[2]^2) %>% #distance euclidienne
-      apply(1, function(x) x == min(x)) %>%  #trouve point le plus proche
-      apply(1, any) # combinaison de A ayant au moins un X proche
-
-
-  #function that check if point(s) X is/are feasible
-  g = function(X, ref_points, feasible_ref_points, K){
-
-    d = NCOL(ref_points)
-    X = matrix(X, ncol = d)
-    n = NROW(X)
-
-    XX = array(X, dim = c(n, d, K))
-    AA = array(ref_points, c(K, d, n)) %>%
-      apply(c(3, 2, 1), FUN = function(x) x)
-
-    closest_ref_points = apply(XX - AA, c(1,3), function(x) x[1]^2 + x[2]^2) %>%
-      apply(1, function(x) x == min(x))
-
-    res = closest_ref_points[feasible_ref_points, ]
-
-    if (length(dim(res)) > 1){
-      apply(res, 2, any)
-    }else{
-      any(res)
-    }
+    list(
+      X_num = X,
+      H = H,
+      threshold = threshold
+    )
   }
 
-  formals(g)$ref_points = ref_points
-  formals(g)$feasible_ref_points = feasible_ref_points
-  formals(g)$K = K
+  if (all(is_fac)){
+    res = unique(X)
+  }else if (any(is_fac)){
+    combinaison = data.frame(X) %>% dplyr::group_by_if(is.factor) %>%
+      dplyr::summarise(n = n()) %>% filter(n > N) %>% select(-n)
+
+    lapply(seq_len(NROW(combinaison)), function(k){
+      mask = sapply(seq_len(n), function(i) all(X[i, is_fac, drop = FALSE] == combinaison[k,]))
+      X_num = X[mask, !is_fac]
+      res = fit_density(X_num)
+
+      res$combi = combinaison[k,]
+      res$mask = mask
+      res
+    }) -> res
+
+  }else{
+    res = fit_density(X)
+  }
+
+  g = function(x, res, d){
+
+    if (NCOL(x) < d){
+      x = matrix(x, ncol = d)
+    }
+    x = data.frame(x)
+    n = NROW(x)
+    id = seq_len(n)
+
+    if (class(res) == "list"){
+      if (class(res[[1]]) == "list"){ #melange quanti / quali
+        is_fac = sapply(x, is.factor)
+        combinaison = unique(x[,is_fac, drop = FALSE])
+
+        lapply(seq_len(NROW(combinaison)), function(k){
+          mask = sapply(seq_len(n), function(i) all(x[i, is_fac, drop = FALSE] == combinaison[k, ,drop = FALSE]))
+
+          res_idx_k = sapply(seq_along(res), function(i){
+            if (all(res[[i]]$combi == combinaison[k, , drop = FALSE])){
+              i
+            }else{
+              NULL
+            }
+          }) %>% unlist()
+
+          if (!is.null(res_idx_k)){
+            res_k = res[[res_idx_k]]
+
+            data.frame(
+              id = id[mask],
+              feasible = ks::kde(x = res_k$X_num, H = res_k$H,
+                                 eval.points = x[mask, !is_fac])$estimate > res_k$threshold)
+          }else{
+            data.frame(id = id[mask], feasible = FALSE)
+          }
+
+
+        }) %>% bind_rows() %>% arrange(id) %>% pull(feasible)
+
+      }else{ #que des quanti
+        ks::kde(x = res$X_num, H = res$H, eval.points = x)$estimate > res$threshold
+      }
+
+    }else{ #que des quali
+      combinaison = unique(x)
+      id = seq_len(n)
+      lapply(seq_len(NROW(combinaison)), function(k){
+
+        mask = sapply(seq_len(n), function(i) all(x[i, , drop = FALSE] == combinaison[k, ,drop = FALSE]))
+        res_idx_k = sapply(seq_len(NROW(res)), function(i){
+          if (all(res[i, , drop = FALSE] == combinaison[k, , drop = FALSE])){
+            i
+          }else{
+            NULL
+          }
+        }) %>% unlist()
+
+        data.frame(id = id[mask], feasible = !is.null(res_idx_k))
+
+      }) %>% bind_rows() %>% arrange(id) %>% pull(feasible)
+
+    }
+
+
+  }
+
+  formals(g)$res = res
+  formals(g)$d = NCOL(X)
 
   res = list(
-    ref_points = ref_points,
-    feasible_ref_points = ref_points[feasible_ref_points,],
     g = g,
-    h = h
+    X = X
   )
 
   class(res) = "combi_space"
   res
+
+
 }
+
+
 
 #' @export
-plot.combi_space <- function(X, m = rep(3, NCOL(X$feasible_ref_points))){
+plot.combi_space <- function(res, filtre = NULL){
 
-  df = lapply(seq_along(X$h), function(j){
-    if (m[j] == 3){
-      l = seq(-1, 1, length.out = m[j])
-    }else{
-      l = 0
+
+  d = NCOL(res$X)
+  n = NROW(res$X)
+  is_num = sapply(res$X, is.numeric)
+
+  mini = floor(apply(res$X[, is_num], 2, min))
+  maxi = ceiling(apply(res$X[, is_num], 2, max))
+
+  n_MC = 5000
+  X_MC = sapply(seq_len(d), function(i){
+    runif(n_MC, mini[i], maxi[i])
+  }) %>% as.data.frame()
+
+  combinaison = unique(res$X[,!is_num])
+  X_MC = cbind(X_MC, combinaison[sample(seq_len(NROW(combinaison)),
+                                        size = n_MC, replace = TRUE), ])
+
+
+
+  if (!is.null(colnames(res$X))){
+    colnames(X_MC) = colnames(res$X)
+  }else{
+    colnames(X_MC) = paste0("X_", seq_along(X_MC))
+  }
+
+
+  if (!is.null(filtre)){
+
+    df_res = X_MC
+    for (x_name in names(filtre)){
+
+      if (is.numeric(res$X[,x_name])){
+        df_res = df_res %>% filter(!!rlang::sym(x_name) > filtre[[x_name]][1] &
+                                         !!rlang::sym(x_name) < filtre[[x_name]][2])
+      }else{
+        df_res = df_res %>% filter(!!rlang::sym(x_name) %in% filtre[[x_name]])
+      }
+
+
     }
-    lapply(l, function(k){
-      data.frame(X = X$feasible_ref_points[,j] + k*X$h[j]/2,
-                 id = 1:NROW(X$feasible_ref_points))
-    }) %>% bind_rows()
-  }) %>% purrr::reduce(full_join, by = "id") %>%
-    gather(key = X_j, value = coord, -id) %>%
-    mutate(id = as.factor(id),
-           X_j = as.factor(X_j))
 
-  dd <- plotly::highlight_key(df, ~id)
-  p = ggplot(dd, aes(x = X_j, y = coord)) +
-    geom_point(aes(group = id)) +
-    facet_wrap(~ X_j)
+  }
 
-  plotly::ggplotly(p, tooltip = "coord") %>%
-    highlight(on = "plotly_selected", color = "red")
 
+  df_res_num = df_res[,is_num] %>% mutate(id = seq_len(NROW(.)),
+                             feasible = res$g(df_res)) %>%
+        gather(key = X_j, value = coord, -id, - feasible) %>% select(-id) %>%
+    mutate(x = as.numeric(as.factor(X_j)))
+
+  df_res_fac = df_res[,!is_num] %>% mutate(id = seq_len(NROW(.)),
+                                          feasible = res$g(df_res)) %>%
+    gather(key = X_j, value = coord, -id, - feasible) %>% select(-id)
+
+  ggplot(df_res_num, aes(x = x, y = coord)) +
+    facet_wrap(~X_j, "free") +
+    geom_point(aes(colour = feasible ))
+
+  ggplot(df_res_fac, aes(x = X_j, y = coord)) +
+    geom_point(aes(colour = feasible )) +
+    facet_wrap(~X_j) #, "free")
 }
 
 
 
-
-
-
-##### interpolation hypothese basé sur absence d'interations entre deux X pour une fonction donnee... mais sur un espace observé seulement...
-# f1 = function(x){
-#   x[1] + x[2]
-# }
-#
-# f2 = function(x){
-#   x[1] + x[2] + x[1] * x[2]
-# }
-#
-# f3 = function(x){
-#   if ((x[1] < B[2,1] & x[2] < B[2,2] & x[1] > b[2,1] & x[2] > b[2,2]) |
-#       (x[1] > b[1,1] & x[2] > b[1,2] & x[1] < B[1,1] & x[2] < B[1,2])){
-#     x[1] + x[2] + x[1] * x[2]
-#   }else{
-#     x[1] + x[2] - 3*x[1] * x[2]
-#   }
-# }
-#
-#
-# Y = sapply(list(f1, f2, f3), function(f){
-#   sapply(seq_len(NROW(X)), function(i){
-#     f(X[i,])
-#   })
-# })
-#
-#
-# Y_c = sapply(list(f1, f2, f3), function(f){
-#   sapply(seq_len(NROW(X_c)), function(i){
-#     f(X_c[i,])
-#   })
-# })
-#
-#
-# #on regarde sur l'ensemble de R2 maintenant dans le cas ou on a f3
-# Z = data.frame(X, Y = Y) %>% gather(key = f, value = Y, -X1, -X2) %>%
-#   mutate(f = as.factor(f)) %>% filter(f == "Y.3")
-#
-#
-# plot3D::scatter3D(x = Z$X1, y = Z$X2, z = Z$Y)
-# plot3Drgl::plotrgl()
-#
-#
-# fit1 = lm(Y_c[,1] ~ X_c[,1]*X_c[,2])
-# summary(fit1)
-#
-# fit2 = lm(Y_c[,2] ~ X_c[,1]*X_c[,2])
-# summary(fit2)
-#
-# df = data.frame(y=Y_c[,3], X_c)
-# deg = 3
-# formule = paste0("y ~ ", "(", paste(colnames(df)[-1], collapse = " + "), ")^", deg)
-# fit3 = lm(formule, data = df)
-#
-# #on se base sur p.value associé a chaque beta pour le model globale
-# summary(fit3)$coefficients[-1, "Pr(>|t|)"]
-#
-# #on se base sur le meilleur model --> selection varable
-# best_fit = step(fit3)
-# summary(best_fit)$coefficients[-1, "Pr(>|t|)"]
 
 
