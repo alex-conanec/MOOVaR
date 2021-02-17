@@ -85,58 +85,111 @@
 #'
 #' @export
 
-conditionnal_quantile <- function(X, Y, x, alpha, h_n = NULL, iter_max = 15,
-                                    tol = 0.001){
+conditionnal_quantile <- function(X, Y, x, alpha, parametric = FALSE,
+                                  h_n = NULL, beta = NULL, deg = 3,
+                                  iter_max = 15, tol = 0.001){
 
-  ##bisection method
+  if (!parametric){
+    ##bisection method
 
-  # find the root of f
-  f <- function(y, x, alpha){
-    alpha - F_n(X = X, Y = Y, x = x, y = y, h_n = h_n)
+    # find the root of f
+    f <- function(y, x, alpha){
+      1 - alpha - F_n(X = X, Y = Y, x = x, y = y, h_n = h_n)
+    }
+
+    x = as.matrix(x)
+    q = NROW(x)
+
+    if (q > 1 & length(alpha) == 1) alpha = rep(alpha, q)
+
+    a = rep(max(Y), q)
+    b = rep(min(Y), q)
+
+    names(a) = seq_len(q)
+    res = data.frame(matrix(NA, ncol = 3, nrow = q))
+    colnames(res) = c("iter", "y", "f(y)")
+
+    for (i in seq_len(iter_max)){
+
+      c = (a+b)/2
+
+      f_c = f(y = c, x, alpha)
+
+      # tolerance
+      done = abs(f_c) < tol
+      row_done = as.numeric(names(c)[done])
+
+      res[row_done, 1] = i
+      res[row_done, 2] = c[done]
+      res[row_done, 3] = f_c[done]
+
+      if (all(done)) break
+
+      a = a[!done]; b = b[!done]; c = c[!done]; x = x[!done,, drop = F]; f_c = f_c[!done]; alpha = alpha[!done]
+
+      neg = sign(f_c) < 0
+      pos = sign(f_c) > 0
+      a[neg] = c[neg]
+      b[pos] = c[pos]
+
+    }
+
+    not_done_yet = is.na(res$iter)
+    res[not_done_yet, 1] = i
+    res[not_done_yet, 2] = c
+    res[not_done_yet, 3] = f_c
+
+    res
+  }else{
+
+    # d = NCOL(X)
+    # if (NCOL(x) < d){
+    #   x = as.data.frame(matrix(x, ncol = d))
+    # }
+
+    if (is.null(beta)){
+      beta = fit_beta(X, Y, deg, alpha)
+    }
+
+    x_mat = cbind(1, lapply(1:deg, function(k){
+      res = data.frame(x^k)
+      colnames(res) = paste0(colnames(res), "_deg_", k)
+      res
+    }) %>% bind_cols()) %>% as.matrix()
+
+    (beta %*% t(x_mat))[1,]
+
   }
 
-  x = as.matrix(x)
-  q = NROW(x)
-
-  if (q > 1 & length(alpha) == 1) alpha = rep(alpha, q)
-
-  a = rep(max(Y), q)
-  b = rep(min(Y), q)
-
-  names(a) = seq_len(q)
-  res = data.frame(matrix(NA, ncol = 3, nrow = q))
-  colnames(res) = c("iter", "y", "f(y)")
-
-  for (i in seq_len(iter_max)){
-
-    c = (a+b)/2
-
-    f_c = f(y = c, x, alpha)
-
-    # tolerance
-    done = abs(f_c) < tol
-    row_done = as.numeric(names(c)[done])
-
-    res[row_done, 1] = i
-    res[row_done, 2] = c[done]
-    res[row_done, 3] = f_c[done]
-
-    if (all(done)) break
-
-    a = a[!done]; b = b[!done]; c = c[!done]; x = x[!done,, drop = F]; f_c = f_c[!done]; alpha = alpha[!done]
-
-    neg = sign(f_c) < 0
-    pos = sign(f_c) > 0
-    a[neg] = c[neg]
-    b[pos] = c[pos]
-
-  }
-
-  not_done_yet = is.na(res$iter)
-  res[not_done_yet, 1] = i
-  res[not_done_yet, 2] = c
-  res[not_done_yet, 3] = f_c
-
-  res
 }
 
+#' @export
+fit_beta = function(X, Y, deg, alpha){
+
+  n = NROW(X)
+  d = NCOL(X)
+
+  X = as.data.frame(X)
+
+  rho = function(u, p){
+    p*u*as.numeric(u>=0) - (1-p) * u * as.numeric(u<0)
+  }
+
+  X_mat = cbind(1, lapply(1:deg, function(k){
+    res = X^k
+    colnames(res) = paste0(colnames(res), "_deg_", k)
+    res
+  }) %>% bind_cols()) %>% as.matrix()
+
+
+
+  critere = function(beta){
+    sum(sapply(seq_len(n), function(i) rho(u = Y[i] - beta %*% X_mat[i,], p = 1-alpha)))
+  }
+
+
+  beta0 = rep(0, deg*d+1)
+
+  optim(par = beta0, fn = critere)$par
+
+}

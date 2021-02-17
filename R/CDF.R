@@ -63,3 +63,30 @@ F_n <- function(X, Y, y, x, h_n = NULL){
   Nn/Dn
   # return(1)
 }
+
+
+F_n2 <- function(X, Y, y, x, H = NULL){
+
+  if (is.null(H)){
+    H = ks::Hpi(x=X)
+  }
+
+
+  m = NROW(x)
+  n = NROW(X)
+  d = NROW(X)
+  w = sapply(seq_len(m), function(i){
+    ks::kde(x=X, H=H, eval.points = matrix(x[i,], nrow = n, ncol = d, byrow = TRUE)
+            - X)$estimate
+  })
+
+
+  ind_y = matrix( apply(matrix(Y, ncol = m, nrow = n, byrow = FALSE), MARGIN = 1,
+                        function(x) as.numeric(x <= y)), nrow = m)
+
+
+  # somme du produit scalaire entre w et l'indicatrice puis quotien
+  Nn <- colSums(w * t(ind_y))
+  Dn <- colSums(w)
+  Nn/Dn
+}
