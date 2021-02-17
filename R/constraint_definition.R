@@ -61,21 +61,63 @@
 #'
 #' @export
 
-def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
+def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1, non ?
 
-  is_fac = sapply(data.frame(X), is.factor)
+  X = as.data.frame(X)
+  is_fac = !sapply(data.frame(X), is.numeric)
+
+  for (k in which(is_fac)) X[,k] = as.factor(X[,k, drop=T])
 
   d1 = sum(!is_fac)
   d2 = sum(is_fac)
   n = NROW(X)
 
-  fit_density = function(X){
-    H = ks::Hpi(x=X)
-    fhat = ks::kde(x=X, H=H, eval.points = X)$estimate
+  fit_density = function(X, alpha){
+
+    cst_col = sapply(X, function(x) length(unique(x)) == 1)
+    if (any(cst_col)){
+      values_cst = unique(X[,cst_col])
+      X = X[,!cst_col]
+    }else{
+      values_cst = NULL
+    }
+
+
+    #reduction dimensionnelle pour que NCOL(X) <= 6
+    eig = eigen(cor(X))
+    P = eig$vectors
+    ncp_max = length(eig$values)
+    ncp = min(6, ncp_max)
+
+    if (ncp < ncp_max){
+      cat("Perte de", 100*round(sum(eig$values[(ncp + 1):ncp_max])/sum(eig$values), 2),
+          "% d'information pour verifier contrainte d'appartenance a X ronde \n" )
+    }
+
+    #reduction de X
+    mean_X = sapply(X, mean)
+    s_X = sapply(X, sd)
+    mean_mat = matrix(mean_X, ncol = length(mean_X),
+                      nrow=nrow(X), byrow = TRUE)
+    s_mat = matrix(s_X, ncol = length(mean_X),
+                   nrow=nrow(X), byrow = TRUE)
+    Z = as.matrix((X - mean_mat)/s_mat)
+
+    #changement de base
+    A = (Z %*% P)[,seq_len(ncp)]
+
+    H = ks::Hpi(x = A)
+    fhat = ks::kde(x = A, H=H, eval.points = A)$estimate
     threshold = quantile(fhat, probs = alpha)
 
     list(
-      X_num = X,
+      A = A,
+      P = P, #matrice de passage
+      ncp = ncp, #nb d'axe conserves
+      mean_X = mean_X,
+      s_X = s_X,
+      cst_col = cst_col,
+      values_cst = values_cst,
       H = H,
       threshold = threshold
     )
@@ -85,12 +127,13 @@ def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
     res = unique(X)
   }else if (any(is_fac)){
     combinaison = data.frame(X) %>% dplyr::group_by_if(is.factor) %>%
-      dplyr::summarise(n = n()) %>% filter(n > N) %>% select(-n)
+      dplyr::summarise(n = n()) %>% filter(n > (sum(!is_fac) + 1)) %>% select(-n) #comment il gere ceux qui ont moins de (sum(!is_fac) + 1) ind ?
 
-    lapply(seq_len(NROW(combinaison)), function(k){
+    K = NROW(combinaison)
+    lapply(seq_len(K), function(k){
       mask = sapply(seq_len(n), function(i) all(X[i, is_fac, drop = FALSE] == combinaison[k,]))
       X_num = X[mask, !is_fac]
-      res = fit_density(X_num)
+      res = fit_density(X=X_num, alpha = alpha/K)
 
       res$combi = combinaison[k,]
       res$mask = mask
@@ -98,7 +141,7 @@ def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
     }) -> res
 
   }else{
-    res = fit_density(X)
+    res = fit_density(X, alpha)
   }
 
   g = function(x, res, d){
@@ -112,7 +155,8 @@ def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
 
     if (class(res) == "list"){
       if (class(res[[1]]) == "list"){ #melange quanti / quali
-        is_fac = sapply(x, is.factor)
+        is_fac = !sapply(x, is.numeric)
+        for (k in which(is_fac)) x[,k] = as.factor(x[,k, drop=TRUE])
         combinaison = unique(x[,is_fac, drop = FALSE])
 
         lapply(seq_len(NROW(combinaison)), function(k){
@@ -126,14 +170,36 @@ def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
             }
           }) %>% unlist()
 
-          if (!is.null(res_idx_k)){
+          if (!is.null(res_idx_k)){ #si le n ind par comb etait suffisant
             res_k = res[[res_idx_k]]
+
+            #check cst
+            n_k = length(which(mask))
+            res_cst = rep(TRUE, n_k)
+            if (any(res_k$cst_col)){
+              res_cst = x[mask,!is_fac][,res_k$cst_col, drop=FALSE] == #a checker quand il ya plus d'une cst
+                matrix(res_k$values_cst, nrow = n_k,
+                     ncol = length(res_k$values_cst), byrow = T)
+              x = x[mask,!is_fac][,!res_k$cst_col]
+            }else{
+              x = x[mask, !is_fac]
+            }
+
+            #changement de base
+            mean_mat = matrix(res_k$mean_X, ncol = length(res_k$mean_X),
+                              nrow=nrow(x), byrow = TRUE)
+            s_mat = matrix(res_k$s_X, ncol = length(res_k$mean_X),
+                           nrow=nrow(x), byrow = TRUE)
+            x_scale = as.matrix((x - mean_mat)/s_mat)
+            x_new = (x_scale %*% res_k$P)[,seq_len(res_k$ncp)]
+
+            feasible = ks::kde(x = res_k$A, H = res_k$H,
+                               eval.points = x_new)$estimate > res_k$threshold
 
             data.frame(
               id = id[mask],
-              feasible = ks::kde(x = res_k$X_num, H = res_k$H,
-                                 eval.points = x[mask, !is_fac])$estimate > res_k$threshold)
-          }else{
+              feasible = apply(cbind(feasible, res_cst), 1, all))
+          }else{ #sinon False
             data.frame(id = id[mask], feasible = FALSE)
           }
 
@@ -141,7 +207,24 @@ def_cstr_X_space <- function(X, alpha = 0.05, N = 5){
         }) %>% bind_rows() %>% arrange(id) %>% pull(feasible)
 
       }else{ #que des quanti
-        ks::kde(x = res$X_num, H = res$H, eval.points = x)$estimate > res$threshold
+
+        # #check cst #normalement il faut pas introduire de cst dans les X !!!
+        # res_cst = rep(TRUE, NROW(x))
+        # if (any(res$cst_col)){
+        #   res_cst = apply(
+        #     sapply(res$cst_col, function(j) x[,j] == res$values_cst[j]),
+        #     1, all)
+        # }
+
+        #changement de base
+        mean_mat = matrix(res$mean_X, ncol = length(res$mean_X),
+                          nrow=nrow(x), byrow = TRUE)
+        s_mat = matrix(res$s_X, ncol = length(res$mean_X),
+                       nrow=nrow(x), byrow = TRUE)
+        x_scale = as.matrix((x - mean_mat)/s_mat)
+        x_new = x_scale %*% res$P
+
+        ks::kde(x = res$A, H = res$H, eval.points = x_new)$estimate > res$threshold
       }
 
     }else{ #que des quali
