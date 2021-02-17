@@ -3,6 +3,7 @@ library(optisure)
 set.seed(12)
 n <- 300
 
+# fffffffffffffffffffffff
 # X quanti ----
 # X
 d1 = 3
