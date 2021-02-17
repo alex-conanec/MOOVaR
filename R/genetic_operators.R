@@ -26,15 +26,14 @@ crossing_over <- function(X, parents, crossing_over_size){
     q = NCOL(X)
     n = NROW(parents)
 
-    lapply(seq_len(n), function(i){
+    res = lapply(seq_len(n), function(i){
       c1 = sample(seq_len(NCOL(X)), size = crossing_over_size, replace = FALSE)
       c2 = seq_len(NCOL(X))[-c1]
       rbind(
         cbind(X[parents[i, 1], c1, drop = F], X[parents[i, 2], c2, drop = F]),
         cbind(X[parents[i, 1], c2, drop = F], X[parents[i, 2], c1, drop = F])
       )
-    }) %>% bind_rows()
-
+    }) %>% bind_rows() %>% select(!!colnames(X))
 }
 
 #' Mutation operator
