@@ -75,100 +75,201 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-optisure <- function(X, Y, sens = rep("min", NCOL(Y)), alpha = 0.5, N = NULL,
-                     B = NULL, seed = NULL){
+optisure <- function(X, Y, fn, sens = rep("min", length(Y)),
+                     g = NULL, X_space_csrt = TRUE, parametric = FALSE,
+                     alpha = 0.5, deg = 3, N = NULL, B = NULL, seed = NULL){
 
-  cat("Recherche de la/les fenetre(s) mobile(s) optimale(s)\n")
+  fn_to_opt = fn
+  d = NCOL(X)
+  p = NCOL(Y)
+  col_names_Y = colnames(Y)
+
+  alpha_j = sapply(sens, function(x) if (x == "min") alpha else 1 - alpha)
+
+  X = as.data.frame(X)
+  Y = as.data.frame(Y)
+
+  if (!parametric){
+    cat("Recherche de la/les fenetre(s) mobile(s) optimale(s)\n")
+  }else{
+    cat("fit beta\n")
+  }
+
 
   #anayse des factors dans X
-  is_fac = sapply(X, is.factor)
+  is_fac = !sapply(X, is.numeric)
 
   if (any(is_fac)){
     X_fac = X[,is_fac]
+    for (k in seq_along(X_fac)) X_fac[,k] = as.character(X_fac[,k])
     combinaisons = unique(X_fac)
+
     # a checker quand combinaisons est nul!
     lapply(seq_len(NROW(combinaisons)), function(i){
       combi = combinaisons[i,]
-
       mask = which(apply(data.frame(
-        X[, is_fac] == matrix(as.character(combi), ncol = 2, nrow = NROW(X), byrow = TRUE)
+        X[, is_fac] == as.data.frame(matrix(combi, ncol = 2, nrow = NROW(X), byrow = TRUE))
       ), 1, all))
 
-      list(X_num = X[mask, !is_fac], X_fac = X[mask, is_fac], Y = Y[mask,],
+      list(X_num = X[mask, !is_fac],
+           # X_fac = X[mask, is_fac],
+           Y = Y[mask,],
            combi = combi)
     }) -> train_datas
 
 
-    #calcul du h_n (des h_n si on a des var quali)
-    lapply(seq_along(Y), function(j){
-      cat(colnames(Y)[j], "\n")
-      lapply(train_datas, function(data){
-        cat("Combinaison",
-            paste(colnames(X)[is_fac], data$combi, collapse = ' -- ', sep = ": "),
-            "\n")
-        hopt(X = data$X_num, Y = data$Y[,j])$h
-      })
-    }) -> all_h
+    if (!parametric){
+      #calcul du h_n (des h_n si on a des var quali)
+      lapply(seq_along(Y), function(j){
+        cat(colnames(Y)[j], "\n")
+        lapply(train_datas, function(data){
+          cat("Combinaison",
+              paste(colnames(X)[is_fac], data$combi, collapse = ' -- ', sep = ": "),
+              "\n")
+          hopt(X = data$X_num, Y = data$Y[,j])$h
+        })
+      }) -> all_h
+    }else{
+      #calcul du h_n (des h_n si on a des var quali)
+      lapply(seq_along(Y), function(j){
+        cat(colnames(Y)[j], "\n")
+        lapply(train_datas, function(data){
+          cat("Combinaison",
+              paste(colnames(X)[is_fac], data$combi, collapse = ' -- ', sep = ": "),
+              "\n")
+          fit_beta(X = data$X_num, Y = data$Y[,j], deg = deg, alpha = alpha_j[j])
+        })
+      }) -> all_beta
+    }
 
+    # function to optimize in NSGA
+    fn = function(x){
 
-    # les h tres importants s'explique par une tres faible correlation entre le X en question et le Y
-    # combiné à une bonne correlation d'un des autres X.
-
-    # library(FactoMineR)
-    # PCA(X = cbind(train_datas[[3]]$X_num, train_datas[[3]]$Y))
-    # cor(cbind(train_datas[[2]]$X_num, train_datas[[2]]$Y))
-
-    #initiation de la fonction avec quantile
-    fn = lapply(seq_len(p), function(j){
-      function(X){
-        lapply(seq_along(train_datas), function(q){
-
-          #filtre par combinaison
-          mask = which(apply(data.frame(
-            X[, is_fac] == matrix(as.character(train_datas[[q]]$combi), ncol = 2, nrow = NROW(X), byrow = TRUE)
-          ), 1, all))
-          X_combi = X[mask,]
-
-          #calcul le quantile pour chaque combinaison
-          if (NROW(X_combi) > 0){
-            data.frame(
-              y = conditionnal_quantile(X = train_datas[[q]]$X_num,
-                                        Y = train_datas[[q]]$Y[,j],
-                                        x = X_combi[, !is_fac],
-                                        alpha,
-                                        h_n = all_h[[p]][[q]])$y,
-              id = mask
-            )
-          }else NULL
-        }) %>% bind_rows() %>% arrange(id) %>% pull(y)
+      if (NCOL(x) < d){
+        x = matrix(x, ncol = d)
       }
-    })
+      x = data.frame(x)
+      n = NROW(x)
+
+      #on cherche les combinaison de x
+      combi_x = unique(x[,is_fac])
+
+      #pour toutes les combinaison de x
+      Y = lapply(seq_len(NROW(combi_x)), function(k){
+        mask = sapply(seq_len(n), function(i){
+          all(x[i, is_fac, drop = FALSE] == combi_x[k, ,drop = FALSE])
+        }) %>% which()
+
+        train_datas_idx_k = sapply(seq_along(train_datas), function(i){
+          if (all(train_datas[[i]]$combi == combi_x[k, , drop = FALSE])){
+            i
+          }else{
+            NULL
+          }
+        }) %>% unlist()
+
+        if (!parametric){
+          #pour toutes les variables de Y
+          res = lapply(seq_len(p), function(j){
+            conditionnal_quantile(X = train_datas[[train_datas_idx_k]]$X_num,
+                                  Y = train_datas[[train_datas_idx_k]]$Y[,j],
+                                  x = x[mask, !is_fac],
+                                  alpha = alpha_j[j],
+                                  h_n = all_h[[j]][[train_datas_idx_k]])$y
+          }) %>% as.data.frame() %>% mutate(id = mask)
+        }else{
+          res = lapply(seq_len(p), function(j){
+            conditionnal_quantile(X = train_datas[[train_datas_idx_k]]$X_num,
+                                  Y = train_datas[[train_datas_idx_k]]$Y[,j],
+                                  x = x[mask, !is_fac],
+                                  alpha = alpha_j[j],
+                                  parametric = TRUE,
+                                  beta = all_beta[[j]][[train_datas_idx_k]],
+                                  deg = deg)
+          }) %>% as.data.frame() %>% mutate(id = mask)
+        }
+
+
+        colnames(res) = c(col_names_Y, "id")
+        res
+      }) %>% bind_rows() %>% arrange(id) %>% select(-id)
+
+      lapply(fn_to_opt, function(f){
+        f(x, Y)
+      }) %>% as.data.frame()
+
+    }
+
+
 
   }else{ #si que des quanti
 
-    h_n = lapply(seq_along(Y), function(j) hopt(X = X, Y = Y[,j])$h )
-    fn = lapply(seq_len(p), function(j){
-      function(x){
-        conditionnal_quantile(X = X,
-                              Y = Y[,j],
-                              x = x,
-                              alpha,
-                              h_n = h_n[[j]])$y
+    if (!parametric){
+      h_n = lapply(seq_along(Y), function(j) hopt(X = X, Y = Y[,j])$h )
+      fn = function(x){
+
+        Y = lapply(seq_len(p), function(j){
+          conditionnal_quantile(X = X,
+                                Y = Y[,j],
+                                x = x,
+                                alpha = alpha_j[j],
+                                h_n = h_n[[j]])$y
+        }) %>% as.data.frame()
+
+        colnames(Y) = col_names_Y
+
+        lapply(fn_to_opt, function(f){
+          f(x, Y)
+        }) %>% as.data.frame()
+
       }
-    })
+    }else{
+      beta = lapply(seq_along(Y), function(j) fit_beta(X = X, Y = Y[,j], alpha = alpha_j[j], deg = deg) )
+      fn = function(x){
+
+        Y = lapply(seq_len(p), function(j){
+          conditionnal_quantile(X = X,
+                                Y = Y[,j],
+                                x = x,
+                                alpha = alpha_j[j],
+                                parametric = TRUE,
+                                beta = beta[[j]])
+        }) %>% as.data.frame()
+
+        colnames(Y) = col_names_Y
+
+        lapply(fn_to_opt, function(f){
+          f(x, Y)
+        }) %>% as.data.frame()
+
+      }
+    }
+
 
   }
 
-  names(fn) = paste0("Y", seq_along(Y))
-
   #tunage nsga parametres
-  if (is.null(N)) N = 50
+  if (is.null(N)) N = 50 ############
   if (is.null(B)) B = 20
 
+  if (X_space_csrt){
+    cat("Train belonging to density constraint \n")
+    g$cstr_X_space = def_cstr_X_space(X)$g
+  }
+
   #appelle de NSGA ou optim si NCOL(Y)==1
-  res = NSGA(X = X, fn, N = N, seed = seed, B = B, verbose = TRUE)
+  res = NSGA(X = X, fn, n_objective = length(fn_to_opt), g=g,
+             sens = sens,
+             N = N, seed = seed,
+             B = B, verbose = TRUE)
 
   #mise en forme des resultats
-  res
+  res$fn = function(X, Y){
+    as.data.frame(sapply(fn_to_opt, function(f) f(X, Y)))
+  }
 
+  formals(res$fn)$Y = Y
+  res$alpha = alpha
+
+  res
 }
