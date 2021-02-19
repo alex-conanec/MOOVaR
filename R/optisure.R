@@ -164,14 +164,16 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
     m
   }
 
-  quant_reg_global_risk = function(X, Y, tau, plafond = 0.95, max_iter = 20){
+  quant_reg_global_risk = function(X, Y, tau, plafond = 0.95, max_iter = 10){
 
-    d = NCOL(X_mat)
     lambda = rep(0, p)
     lambda_prec = rep(1, p)
 
+    eta = function(t, initial_eta = 1.5, k = 0.3){
+      initial_eta * exp(-k*t)
+    }
 
-    for (it in seq_len(max_iter)){
+    for (t in seq_len(max_iter)){
       m = fit_model(tau + lambda)
 
       #eval
@@ -182,10 +184,10 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
 
       #evolution lambda
       S = sapply(seq_len(p), function(j){
-        sum(apply(delta[, -j] < 0, 1, all))/n
+        sum(apply(delta[, -j, drop = FALSE] < 0, 1, all))/n
       })
       S = S/sum(S)
-      lambda = lambda + (tau - L) * S
+      lambda = lambda + (tau - L) * S * eta(t)
 
       #avoid learn too high repartition = avoid estimation pb
       lambda[lambda + tau > plafond] = plafond - tau
@@ -203,7 +205,7 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
   }
 
   if (globale_tau){
-    qrgr = quant_reg_global_risk(X = X_mat, Y, tau)
+    qrgr = quant_reg_global_risk(X = X, Y, tau)
     m = qrgr$m
   }else{
     m = fit_model(tau)
