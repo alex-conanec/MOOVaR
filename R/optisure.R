@@ -76,6 +76,7 @@
 #' @importFrom magrittr %>%
 #' @export
 optisure <- function(X, Y, sens = rep("min", length(Y)),
+                     utility_risk = rep("quantile", length(Y)),
                      g = NULL, X_space_csrt = TRUE,
                      tau = 0.5, globale_tau = FALSE, reg_method = "linear", #rajouté
                      # parametric = FALSE, deg = 3, #a virer
@@ -92,7 +93,7 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
     stop("The penalty must be a vector of size p")
   }
 
-  #sens quantile
+  #sens optimisation
   Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
 
   fit_model = function(tau){
@@ -183,17 +184,21 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
       cat(L, "\n")
 
       #evolution lambda
-      S = sapply(seq_len(p), function(j){
-        sum(apply(delta[, -j, drop = FALSE] < 0, 1, all))/n
-      })
-      S = S/sum(S)
-      lambda = lambda + (tau - L) * S * eta(t)
+      if (p > 2){
+        S = sapply(seq_len(p), function(j){
+          sum(apply(delta[, -j, drop = FALSE] < 0, 1, all))/n
+        })
+        S = S/sum(S)
+        lambda = lambda + (tau - L) * S * eta(t)
+      }else{
+        lambda = lambda + (tau - L) * eta(t)
+      }
+
 
       #avoid learn too high repartition = avoid estimation pb
       lambda[lambda + tau > plafond] = plafond - tau
 
-
-      if (all(lambda == lambda_prec)){
+      if (all(abs(lambda - lambda_prec) < tau * 0.01)){
         break
       }
       lambda_prec = lambda
