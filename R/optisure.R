@@ -75,178 +75,141 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-optisure <- function(X, Y, fn, sens = rep("min", length(Y)),
-                     g = NULL, X_space_csrt = TRUE, parametric = FALSE,
-                     alpha = 0.5, deg = 3, N = NULL, B = NULL, seed = NULL){
+optisure <- function(X, Y, sens = rep("min", length(Y)),
+                     g = NULL, X_space_csrt = TRUE,
+                     tau = 0.5, globale_tau = FALSE, reg_method = "linear", #rajouté
+                     # parametric = FALSE, deg = 3, #a virer
+                     N = NULL, B = NULL, seed = NULL,
+                     penalty = NULL){
 
-  fn_to_opt = fn
   d = NCOL(X)
   p = NCOL(Y)
+  n = NROW(X)
   col_names_Y = colnames(Y)
-
-  alpha_j = sapply(sens, function(x) if (x == "min") alpha else 1 - alpha)
-
-  X = as.data.frame(X)
-  Y = as.data.frame(Y)
-
-  if (!parametric){
-    cat("Recherche de la/les fenetre(s) mobile(s) optimale(s)\n")
-  }else{
-    cat("fit beta\n")
+  if (is.null(penalty)){
+    penalty = rep(NA, p)
+  }else if (length(penalty) < p){
+    stop("The penalty must be a vector of size p")
   }
 
+  #sens quantile
+  Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
 
-  #anayse des factors dans X
-  is_fac = !sapply(X, is.numeric)
+  fit_model = function(tau){
+    if (length(tau) == 1 ) tau = rep(tau, p)
+    if (reg_method == "linear"){
+      X_mat = model.matrix(~., X)[,-1]
+      beta_rq = sapply(seq_len(p), function(j){
+        vide = capture.output(cv_rq <- hqreg::cv.hqreg(X_mat, Y[,j],
+                                                       method = "quantile",
+                                                       tau = tau[j],
+                                                       alpha = 0,
+                                                       ncores = 1, nfolds = 10, seed = 123))
+        cv_rq$fit$beta[,which(cv_rq$lambda == cv_rq$lambda.1se)]
+      })
+      m = function(X) model.matrix(~., X) %*% beta_rq
 
-  if (any(is_fac)){
-    X_fac = X[,is_fac]
-    for (k in seq_along(X_fac)) X_fac[,k] = as.character(X_fac[,k])
-    combinaisons = unique(X_fac)
+    }else if (reg_method == "neural_network"){
 
-    # a checker quand combinaisons est nul!
-    lapply(seq_len(NROW(combinaisons)), function(i){
-      combi = combinaisons[i,]
-      mask = which(apply(data.frame(
-        X[, is_fac] == as.data.frame(matrix(combi, ncol = 2, nrow = NROW(X), byrow = TRUE))
-      ), 1, all))
+      penalty_cv = function(X, y, tau){
 
-      list(X_num = X[mask, !is_fac],
-           # X_fac = X[mask, is_fac],
-           Y = Y[mask,],
-           combi = combi)
-    }) -> train_datas
+        prop_train = 0.8
+        train_idx = sample(seq_len(n), n*prop_train)
+        test_X = X[-train_idx,]
+        test_y = y[-train_idx]
+        train_X = X[train_idx,]
+        train_y = y[train_idx]
 
+        MSE = function(penalty){
+          vide = capture.output(m <- qrnn::qrnn2.fit(x = as.matrix(train_X),
+                          y = as.matrix(train_y),
+                          n.hidden=2, n.hidden2=2,
+                          tau = tau, penalty=penalty))
 
-    if (!parametric){
-      #calcul du h_n (des h_n si on a des var quali)
-      lapply(seq_along(Y), function(j){
-        cat(colnames(Y)[j], "\n")
-        lapply(train_datas, function(data){
-          cat("Combinaison",
-              paste(colnames(X)[is_fac], data$combi, collapse = ' -- ', sep = ": "),
-              "\n")
-          hopt(X = data$X_num, Y = data$Y[,j])$h
-        })
-      }) -> all_h
-    }else{
-      #calcul du h_n (des h_n si on a des var quali)
-      lapply(seq_along(Y), function(j){
-        cat(colnames(Y)[j], "\n")
-        lapply(train_datas, function(data){
-          cat("Combinaison",
-              paste(colnames(X)[is_fac], data$combi, collapse = ' -- ', sep = ": "),
-              "\n")
-          fit_beta(X = data$X_num, Y = data$Y[,j], deg = deg, alpha = alpha_j[j])
-        })
-      }) -> all_beta
-    }
-
-    # function to optimize in NSGA
-    fn = function(x){
-
-      if (NCOL(x) < d){
-        x = matrix(x, ncol = d)
-      }
-      x = data.frame(x)
-      n = NROW(x)
-
-      #on cherche les combinaison de x
-      combi_x = unique(x[,is_fac])
-
-      #pour toutes les combinaison de x
-      Y = lapply(seq_len(NROW(combi_x)), function(k){
-        mask = sapply(seq_len(n), function(i){
-          all(x[i, is_fac, drop = FALSE] == combi_x[k, ,drop = FALSE])
-        }) %>% which()
-
-        train_datas_idx_k = sapply(seq_along(train_datas), function(i){
-          if (all(train_datas[[i]]$combi == combi_x[k, , drop = FALSE])){
-            i
-          }else{
-            NULL
-          }
-        }) %>% unlist()
-
-        if (!parametric){
-          #pour toutes les variables de Y
-          res = lapply(seq_len(p), function(j){
-            conditionnal_quantile(X = train_datas[[train_datas_idx_k]]$X_num,
-                                  Y = train_datas[[train_datas_idx_k]]$Y[,j],
-                                  x = x[mask, !is_fac],
-                                  alpha = alpha_j[j],
-                                  h_n = all_h[[j]][[train_datas_idx_k]])$y
-          }) %>% as.data.frame() %>% mutate(id = mask)
-        }else{
-          res = lapply(seq_len(p), function(j){
-            conditionnal_quantile(X = train_datas[[train_datas_idx_k]]$X_num,
-                                  Y = train_datas[[train_datas_idx_k]]$Y[,j],
-                                  x = x[mask, !is_fac],
-                                  alpha = alpha_j[j],
-                                  parametric = TRUE,
-                                  beta = all_beta[[j]][[train_datas_idx_k]],
-                                  deg = deg)
-          }) %>% as.data.frame() %>% mutate(id = mask)
+          sum((qrnn::qrnn2.predict(as.matrix(test_X), m) - test_y)^2)
         }
 
+        optimize(f = MSE, lower = 0, upper = 1)$minimum
 
-        colnames(res) = c(col_names_Y, "id")
+      }
+
+      for (j in seq_len(p)){
+        if (is.na(penalty[j])){
+          cat("cross-validate determining ridge penalty of the neural network",
+              j, "\n")
+          penalty[j] = penalty_cv(X, Y[,j], tau)
+        }
+      }
+
+      cat("train neural network \n")
+      m_j = lapply(seq_len(p), function(j){
+        vide = capture.output(m <- qrnn::qrnn2.fit(
+          x = as.matrix(X), y = as.matrix(Y[,j, drop=FALSE]),
+          n.hidden=2, n.hidden2=2, tau = tau[j], penalty = penalty[j]))
+        m
+      })
+
+      m = function(X){
+
+        #be sure that NROW(X) > 1 sinon ca fou le bordel
+        res = lapply(m_j, function(m){
+          qrnn::qrnn2.predict(as.matrix(X), m)
+        }) %>% as.data.frame()
+        colnames(res) = colnames(Y)
         res
-      }) %>% bind_rows() %>% arrange(id) %>% select(-id)
-
-      lapply(fn_to_opt, function(f){
-        f(x, Y)
-      }) %>% as.data.frame()
+      }
 
     }
 
-
-
-  }else{ #si que des quanti
-
-    if (!parametric){
-      h_n = lapply(seq_along(Y), function(j) hopt(X = X, Y = Y[,j])$h )
-      fn = function(x){
-
-        Y = lapply(seq_len(p), function(j){
-          conditionnal_quantile(X = X,
-                                Y = Y[,j],
-                                x = x,
-                                alpha = alpha_j[j],
-                                h_n = h_n[[j]])$y
-        }) %>% as.data.frame()
-
-        colnames(Y) = col_names_Y
-
-        lapply(fn_to_opt, function(f){
-          f(x, Y)
-        }) %>% as.data.frame()
-
-      }
-    }else{
-      beta = lapply(seq_along(Y), function(j) fit_beta(X = X, Y = Y[,j], alpha = alpha_j[j], deg = deg) )
-      fn = function(x){
-
-        Y = lapply(seq_len(p), function(j){
-          conditionnal_quantile(X = X,
-                                Y = Y[,j],
-                                x = x,
-                                alpha = alpha_j[j],
-                                parametric = TRUE,
-                                beta = beta[[j]])
-        }) %>% as.data.frame()
-
-        colnames(Y) = col_names_Y
-
-        lapply(fn_to_opt, function(f){
-          f(x, Y)
-        }) %>% as.data.frame()
-
-      }
-    }
-
-
+    m
   }
+
+  quant_reg_global_risk = function(X, Y, tau, plafond = 0.95, max_iter = 20){
+
+    d = NCOL(X_mat)
+    lambda = rep(0, p)
+    lambda_prec = rep(1, p)
+
+
+    for (it in seq_len(max_iter)){
+      m = fit_model(tau + lambda)
+
+      #eval
+      delta = Y - m(X)
+      cat(colSums(delta < 0)/n, "\n")
+      L = sum(apply(delta < 0, 1, all))/n
+      cat(L, "\n")
+
+      #evolution lambda
+      S = sapply(seq_len(p), function(j){
+        sum(apply(delta[, -j] < 0, 1, all))/n
+      })
+      S = S/sum(S)
+      lambda = lambda + (tau - L) * S
+
+      #avoid learn too high repartition = avoid estimation pb
+      lambda[lambda + tau > plafond] = plafond - tau
+
+
+      if (all(lambda == lambda_prec)){
+        break
+      }
+      lambda_prec = lambda
+
+    }
+
+
+    list(model = m, alpha = L, tau = tau + lambda)
+  }
+
+  if (globale_tau){
+    qrgr = quant_reg_global_risk(X = X_mat, Y, tau)
+    m = qrgr$m
+  }else{
+    m = fit_model(tau)
+    m(X)
+  }
+
 
   #tunage nsga parametres
   if (is.null(N)) N = 50 ############
@@ -258,18 +221,17 @@ optisure <- function(X, Y, fn, sens = rep("min", length(Y)),
   }
 
   #appelle de NSGA ou optim si NCOL(Y)==1
-  res = NSGA(X = X, fn, n_objective = length(fn_to_opt), g=g,
-             sens = sens,
+  res = NSGA(X = X, fn = m, n_objective = p, g=g,
+             sens = rep("max", p),
              N = N, seed = seed,
              B = B, verbose = TRUE)
 
   #mise en forme des resultats
-  res$fn = function(X, Y){
-    as.data.frame(sapply(fn_to_opt, function(f) f(X, Y)))
-  }
-
-  formals(res$fn)$Y = Y
-  res$alpha = alpha
+  Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  res$Y = res$Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  res$Y0 = Y
+  colnames(res$Y) = colnames(Y)
+  res$tau = tau
 
   res
 }
