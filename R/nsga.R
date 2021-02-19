@@ -174,8 +174,7 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
 plot.nsga <- function(res, alpha_ellipse = NULL){
 
     library(magrittr)
-    cost_fn_0 = res$fn(res$X0)
-
+    # colnames(res$Y0) = colnames(res$Y)
     is_fac = !sapply(res$X, is.numeric)
     for (k in which(is_fac)) res$X[,k] = as.factor(res$X[,k])
 
@@ -191,7 +190,7 @@ plot.nsga <- function(res, alpha_ellipse = NULL){
                                                     y = combi_y[2, i]),
                                 colour = "blue", size = 2) +
             ggplot2::xlab(combi_y[1, i]) + ggplot2::ylab(combi_y[2, i]) +
-            ggplot2::geom_point(data = cost_fn_0,
+            ggplot2::geom_point(data = res$Y0,
                                 ggplot2::aes_string(x = combi_y[1, i],
                                                     y = combi_y[2, i]),
                                 alpha = 0.3)
@@ -239,10 +238,10 @@ plot.nsga <- function(res, alpha_ellipse = NULL){
     s_y = plotly::subplot(p_y, titleY = TRUE, titleX = TRUE) #, nrows = ceiling(n_y/3))
     s_x = plotly::subplot(p_x, titleX = TRUE) #, nrows = ceiling(n_x/10))
 
-    if (is.null(res$alpha)){
+    if (is.null(res$tau)){
         pareto_title = "Pareto front"
     }else{
-        pareto_title = paste0("Pareto front (alpha=", res$alpha, ")")
+        pareto_title = paste0("Pareto front (alpha=", res$tau, ")")
     }
 
 
