@@ -1,3 +1,4 @@
+
 #' @export
 fit_model = function(X, Y, reg_method, tau = NULL, method = "quantile", penalty = NULL){
   p = NCOL(Y)
