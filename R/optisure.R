@@ -75,146 +75,58 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-optisure <- function(X, Y, sens = rep("min", length(Y)),
-                     utility_risk = rep("quantile", length(Y)),
+optisure <- function(X, Y, sens = rep("min", NCOL(Y)),
+                     utility_risk = rep("quantile", NCOL(Y)),
                      g = NULL, X_space_csrt = TRUE,
                      tau = 0.5, globale_tau = FALSE, reg_method = "linear", #rajouté
                      # parametric = FALSE, deg = 3, #a virer
                      N = NULL, B = NULL, seed = NULL,
-                     penalty = NULL){
+                     ...){
 
+  library(reticulate)
   d = NCOL(X)
   p = NCOL(Y)
   n = NROW(X)
   col_names_Y = colnames(Y)
-  if (is.null(penalty)){
-    penalty = rep(NA, p)
-  }else if (length(penalty) < p){
-    stop("The penalty must be a vector of size p")
-  }
 
   #sens optimisation
-  Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  Y = as.data.frame(Y)
+  # Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
 
-  fit_model = function(tau){
-    if (length(tau) == 1 ) tau = rep(tau, p)
-    if (reg_method == "linear"){
-      X_mat = model.matrix(~., X)[,-1]
-      beta_rq = sapply(seq_len(p), function(j){
-        vide = capture.output(cv_rq <- hqreg::cv.hqreg(X_mat, Y[,j],
-                                                       method = "quantile",
-                                                       tau = tau[j],
-                                                       alpha = 0,
-                                                       ncores = 1, nfolds = 10, seed = 123))
-        cv_rq$fit$beta[,which(cv_rq$lambda == cv_rq$lambda.1se)]
-      })
-      m = function(X) model.matrix(~., X) %*% beta_rq
+  quantile_utility_idx = utility_risk == rep("quantile", NCOL(Y))
 
-    }else if (reg_method == "neural_network"){
-
-      penalty_cv = function(X, y, tau){
-
-        prop_train = 0.8
-        train_idx = sample(seq_len(n), n*prop_train)
-        test_X = X[-train_idx,]
-        test_y = y[-train_idx]
-        train_X = X[train_idx,]
-        train_y = y[train_idx]
-
-        MSE = function(penalty){
-          vide = capture.output(m <- qrnn::qrnn2.fit(x = as.matrix(train_X),
-                          y = as.matrix(train_y),
-                          n.hidden=2, n.hidden2=2,
-                          tau = tau, penalty=penalty))
-
-          sum((qrnn::qrnn2.predict(as.matrix(test_X), m) - test_y)^2)
-        }
-
-        optimize(f = MSE, lower = 0, upper = 1)$minimum
-
-      }
-
-      for (j in seq_len(p)){
-        if (is.na(penalty[j])){
-          cat("cross-validate determining ridge penalty of the neural network",
-              j, "\n")
-          penalty[j] = penalty_cv(X, Y[,j], tau)
-        }
-      }
-
-      cat("train neural network \n")
-      m_j = lapply(seq_len(p), function(j){
-        vide = capture.output(m <- qrnn::qrnn2.fit(
-          x = as.matrix(X), y = as.matrix(Y[,j, drop=FALSE]),
-          n.hidden=2, n.hidden2=2, tau = tau[j], penalty = penalty[j]))
-        m
-      })
-
-      m = function(X){
-
-        #be sure that NROW(X) > 1 sinon ca fou le bordel
-        res = lapply(m_j, function(m){
-          qrnn::qrnn2.predict(as.matrix(X), m)
-        }) %>% as.data.frame()
-        colnames(res) = colnames(Y)
-        res
-      }
-
+  if (any(quantile_utility_idx)){
+    if (globale_tau){
+      qrgr = quant_reg_global_risk(X = X, Y[,quantile_utility_idx, drop = FALSE],
+                                   tau = tau, reg_method = reg_method) #pas sur de la syntax pour transmettre reg_method
+      m_quantile = qrgr$m
+    }else{
+      m_quantile = fit_model(X, Y=Y[,quantile_utility_idx, drop = FALSE],
+                             tau = tau, reg_method = reg_method,
+                             method = "quantile", ...)
+      # m_quantile = fit_model(X, Y=Y[,quantile_utility_idx, drop = FALSE],
+      #                        tau = tau, reg_method = reg_method,
+      #                        method = "quantile", penalty = rep(0,p))
     }
-
-    m
   }
 
-  quant_reg_global_risk = function(X, Y, tau, plafond = 0.95, max_iter = 10){
-
-    lambda = rep(0, p)
-    lambda_prec = rep(1, p)
-
-    eta = function(t, initial_eta = 1.5, k = 0.3){
-      initial_eta * exp(-k*t)
-    }
-
-    for (t in seq_len(max_iter)){
-      m = fit_model(tau + lambda)
-
-      #eval
-      delta = Y - m(X)
-      cat(colSums(delta < 0)/n, "\n")
-      L = sum(apply(delta < 0, 1, all))/n
-      cat(L, "\n")
-
-      #evolution lambda
-      if (p > 2){
-        S = sapply(seq_len(p), function(j){
-          sum(apply(delta[, -j, drop = FALSE] < 0, 1, all))/n
-        })
-        S = S/sum(S)
-        lambda = lambda + (tau - L) * S * eta(t)
-      }else{
-        lambda = lambda + (tau - L) * eta(t)
-      }
-
-
-      #avoid learn too high repartition = avoid estimation pb
-      lambda[lambda + tau > plafond] = plafond - tau
-
-      if (all(abs(lambda - lambda_prec) < tau * 0.01)){
-        break
-      }
-      lambda_prec = lambda
-
-    }
-
-
-    list(model = m, alpha = L, tau = tau + lambda)
+  if (any(!quantile_utility_idx)){
+    m_expect = fit_model(X, Y = Y[,!quantile_utility_idx, drop = FALSE],
+                         reg_method = reg_method, method = "expected")
   }
 
-  if (globale_tau){
-    qrgr = quant_reg_global_risk(X = X, Y, tau)
-    m = qrgr$m
+  if (all(quantile_utility_idx)){
+    m = m_quantile
+  }else if (all(!quantile_utility_idx)) {
+    m = m_expect
   }else{
-    m = fit_model(tau)
-    m(X)
+    m = function(X){
+      res = cbind(m_quantile(X), m_expect(X))[, c(which(quantile_utility_idx),
+                                                  which(!quantile_utility_idx))]
+      colnames(res) = colnames(Y)
+      res
+    }
   }
 
 
@@ -227,6 +139,7 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
     g$cstr_X_space = def_cstr_X_space(X)$g
   }
 
+
   #appelle de NSGA ou optim si NCOL(Y)==1
   res = NSGA(X = X, fn = m, n_objective = p, g=g,
              sens = rep("max", p),
@@ -234,8 +147,20 @@ optisure <- function(X, Y, sens = rep("min", length(Y)),
              B = B, verbose = TRUE)
 
   #mise en forme des resultats
-  Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
-  res$Y = res$Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  if (globale_tau){
+    res$tau_j = qrgr$tau
+    res$globale_confiance = qrgr$globale_confiance
+  }else{
+    res$globale_confiance = sum(apply(Y - m(X) > 0, 1, all))/n
+    res$tau_j = rep(tau, p)
+  }
+
+
+  # Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  # res$Y = res$Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
+  Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+  res$Y = sweep(res$Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+
   res$Y0 = Y
   colnames(res$Y) = colnames(Y)
   res$tau = tau
