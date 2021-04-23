@@ -222,7 +222,7 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
         s_mat = matrix(res$s_X, ncol = length(res$mean_X),
                        nrow=nrow(x), byrow = TRUE)
         x_scale = as.matrix((x - mean_mat)/s_mat)
-        x_new = x_scale %*% res$P
+        x_new = (x_scale %*% res$P)[,seq_len(res$ncp)]
 
         ks::kde(x = res$A, H = res$H, eval.points = x_new)$estimate > res$threshold
       }
