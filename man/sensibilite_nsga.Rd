@@ -4,8 +4,14 @@
 \alias{sensibilite_nsga}
 \title{sensibilite_nsga}
 \usage{
-sensibilite_nsga(X, fn, sens = rep("min", length(fn)), N_MC = 10^4,
-  B = 50, N = 50)
+sensibilite_nsga(
+  X,
+  fn,
+  sens = rep("min", length(fn)),
+  N_MC = 10^4,
+  B = 50,
+  N = 50
+)
 }
 \description{
 sensibilite_nsga

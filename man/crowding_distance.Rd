@@ -4,8 +4,10 @@
 \alias{crowding_distance}
 \title{Crowding distance}
 \usage{
-crowding_distance(Y, threshold = 10^(-5) * sapply(Y[, -((NCOL(Y) -
-  1):NCOL(Y))], sd))
+crowding_distance(
+  Y,
+  threshold = 10^(-5) * sapply(Y[, -((NCOL(Y) - 1):NCOL(Y))], sd)
+)
 }
 \arguments{
 \item{S}{a matrix/data.frame of evaluated points belonging to the same front}

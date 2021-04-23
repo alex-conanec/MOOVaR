@@ -4,9 +4,19 @@
 \alias{NSGA}
 \title{NSGA II algorithm}
 \usage{
-NSGA(X, fn, sens = rep("min", length(fn)), N = round(NROW(X)/2, 0),
-  crossing_over_size = round(NCOL(X)/2), freq_mutation = rep(1/NCOL(X),
-  NCOL(X)), seed = NULL, B = 50, verbose = TRUE)
+NSGA(
+  X,
+  fn,
+  n_objective,
+  sens = rep("min", n_objective),
+  N = round(NROW(X)/2, 0),
+  g = NULL,
+  crossing_over_size = round(NCOL(X)/2),
+  freq_mutation = rep(1/NCOL(X), NCOL(X)),
+  seed = NULL,
+  B = 50,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{X}{a matrix/data.frame of an initial population}

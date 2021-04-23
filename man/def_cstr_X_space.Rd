@@ -4,7 +4,7 @@
 \alias{def_cstr_X_space}
 \title{def_cstr_X_space}
 \usage{
-def_cstr_X_space(X, m = rep(10, NCOL(X)))
+def_cstr_X_space(X, alpha = 0.05)
 }
 \description{
 Find the space where points where observed. Send back a function to check if
@@ -16,55 +16,55 @@ a/several point(s) belong to the space where the points where observed
 }
 \examples{
 library(tidyverse)
+library(optisure)
 
-#generate data ---
-#parameter of the data
-n = 100
-d = 2 #dim de X
+#parameters constraint
+alpha = 0.05
 
-mini = rep(0, d)
-maxi = rep(10, d)
-
-set.seed(123)
-
-#uniform
-X = sapply(seq_len(d), function(i){
-  runif(n, mini[i], maxi[i])
-})
-plot(X)
-
-#avec des trous
-b = matrix(c(0, 0, 5, 5), byrow = T, ncol = d)
-B = matrix(c(4, 4, 10, 10), byrow = T, ncol = d)
+#parameters data
+n = 1000
+d1 = 2
+mini = rep(0, d1)
+maxi = rep(10, d1)
+b = matrix(c(0, 0, 5, 5), byrow = T, ncol = d1)
+B = matrix(c(4, 4, 10, 10), byrow = T, ncol = d1)
 p = NROW(B) #nombre de "foyer"
 
-X_c = sapply(seq_len(d), function(i){
+
+#generate data
+X_U = sapply(seq_len(d1), function(i){
   sapply(seq_len(p), function(k){
     runif(n/p, b[k,i], B[k,i])
   })
+}) \%>\% as.data.frame()
+
+#Monte Carlo simulation of 5000 points to check the constraint
+n_MC = 5000
+X_MC = sapply(seq_len(d1), function(i){
+  runif(n_MC, mini[i], maxi[i])
 })
-plot(X_c)
 
-#use function
-res = def_cstr_X_space(X_c)#check several points
+#visualisation
+res = def_cstr_X_space(X=X_U, alpha = alpha)
+feasible_X_MC = res$g(x = X_MC)
 
-#plot reference points with two colors depending or their feasability
-plot(res$ref_points, pch=3, col = "orange")
-points(res$feasible_ref_points, pch=3, col = "blue")
-points(X_c)
+cols <- c("FALSE" = "red", "training" = "blue", "TRUE" = "green")
+ggplot(data.frame(X_MC, feasible = feasible_X_MC)) +
+  geom_point(aes(x = X1, y = X2, colour = feasible)) +
+  geom_point(data = X_U, aes(x = V1, y = V2, colour = "training"),
+             shape = 17, size = 1) +
+  scale_colour_manual(values = cols)
 
-#check the feasibility
-plot(res$ref_points, pch=3, col = "orange")
-points(res$feasible_ref_points, pch=3, col = "blue")
 
-#of only one point
-i=3
-points(X[i,1], X[i,2], col = c("red", "green")[as.numeric(res$g(X = X[i,])) + 1])
+# verification avec les aires de MC
+# aire theorique de 95\% de la surface
+A_true_uni = (1-alpha) * sum(apply(B-b, 1, prod))
+A_true_uni
 
-#of several points
-points(X, col = c("red", "green")[as.numeric(res$g(X)) + 1])
-
-#visualize the combination of variable. Very useful when d > 2
-plot(res)
+# Aire estime par Monte Carlo
+A_MC = prod(maxi - mini)
+A_estime = A_MC*sum(feasible_X_MC)/n_MC
+A_estime
+(A_estime - A_true_uni)/A_true_uni #ratio
 
 }

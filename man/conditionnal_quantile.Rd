@@ -4,8 +4,18 @@
 \alias{conditionnal_quantile}
 \title{conditionnal_quantile}
 \usage{
-conditionnal_quantile(X, Y, x, alpha, h_n = NULL, iter_max = 15,
-  tol = 0.001)
+conditionnal_quantile(
+  X,
+  Y,
+  x,
+  alpha,
+  parametric = FALSE,
+  h_n = NULL,
+  beta = NULL,
+  deg = 3,
+  iter_max = 15,
+  tol = 0.001
+)
 }
 \arguments{
 \item{X}{a numerical vector, matrix, or data.frame of explanatory variables  of dimension nxq}

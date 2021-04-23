@@ -39,7 +39,7 @@ Lorsque le nombre de variables explicatives est supérieur à 1, la définition 
     &\left\{
         \begin{array}{ll}
             \exists~ i ~|~ {\bf x}_j = {\bf X}^{(2)}_{ij}, ~\forall j \in \{1, \dots, d_2\} ~&\text{si}~ d_1 = 0 \\
-            \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf x}^{(1)} - {\bf X}^{(1)}_i) \geq \Gamma(\alpha) ~&\text{sinon si}~ |E| \geq N \\
+            \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf x}^{(1)} - {\bf X}^{(1)}_i) \geq \Gamma(\alpha/N) ~&\text{sinon si}~ |E| \geq d_1 + 1 \\
             0 ~&\text{sinon,}
         \end{array}
     \right. \\
@@ -50,11 +50,17 @@ Lorsque le nombre de variables explicatives est supérieur à 1, la définition 
         \end{array}
     \right. \\
     \text{et}~& \Gamma(\alpha) = \{q ~|~ P[Y \leq q] = \alpha\}, \\
-    \text{où}~& Y = \{ \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf X}^{(1)}_k - {\bf X}^{(1)}_i), ~\forall k \in E \}
+    & N = \left\{
+        \begin{array}{ll}
+            \prod\limits_{j=1}^{d_2} m_j, ~&\text{si}~ d_2 > 0 \\
+            1 ~&\text{sinon}
+        \end{array}
+    \right.\\
+    \text{où}~& Y = \{ \frac{1}{|E|} \sum\limits_{i \in E} K_H({\bf X}^{(1)}_k - {\bf X}^{(1)}_i), ~\forall k \in E \} 
 \end{align}
 
 
-où $|M|$ dénote la cardinalité de l'ensemble $M$, $K_H$ est un noyau multi-gaussien pondéré par une largeur de fenêtre mobile $H$ de dimension $d_1 \times d_1$, $N$ est le nombre minimum de points nécessaire à l'estimation de la densité et $\alpha$ est le risque d'affirmer que ${\bf x} \not\in \mathcal{X}$ alors que cela est vrai.   
+où $|M|$ dénote la cardinalité de l'ensemble $M$, $K_H$ est un noyau multi-gaussien pondéré par une largeur de fenêtre mobile $H$ de dimension $d_1 \times d_1$ et $\alpha$ est le risque d'affirmer que ${\bf x} \not\in \mathcal{X}$ alors que cela est vrai.   
 
 
 ## Exemple avec $d_1$=2 et $d_2$=0

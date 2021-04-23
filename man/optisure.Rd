@@ -4,8 +4,21 @@
 \alias{optisure}
 \title{optisure}
 \usage{
-optisure(X, Y, sens = rep("min", NCOL(Y)), alpha = 0.5, N = NULL,
-  B = NULL, seed = NULL)
+optisure(
+  X,
+  Y,
+  sens = rep("min", NCOL(Y)),
+  utility_risk = rep("quantile", NCOL(Y)),
+  g = NULL,
+  X_space_csrt = TRUE,
+  tau = 0.5,
+  globale_tau = FALSE,
+  reg_method = "linear",
+  N = NULL,
+  B = NULL,
+  seed = NULL,
+  ...
+)
 }
 \description{
 optisure
@@ -13,32 +26,56 @@ optisure
 \examples{
 # generate data ----
 library(tidyverse)
+library(optisure)
 set.seed(1234)
 n <- 300
 
-#X quanti
+# X quanti ----
+# X
 d1 = 3
 mini <- rep(x = -2, times = d1)
 maxi <- rep(x = 2, times = d1)
-X1 <- lapply(seq_len(d1), function(k){
-  data.frame(runif(n = n, min = mini[k], max = maxi[k]))
-}) \%>\% bind_cols()
+X1 <- sapply(seq_len(d1), function(k){
+  runif(n = n, min = mini[k], max = maxi[k])
+}) \%>\% as.data.frame()
 colnames(X1) = paste0("X", seq_len(d1))
+X = X1
 
-#X quali
+#calcul des Y selon une relation lineaire + du bruit
+p = 2
+fn = lapply(seq_len(p), function(j){
+  beta = runif(n = d1, min = -2, max = 2)
+  function(X) {
+    as.matrix(X) \%*\% beta
+  }
+})
+names(fn) = paste0("Y", seq_len(p))
+
+Y = lapply(fn, function(f){
+  f(X) + rnorm(n)
+}) \%>\% as.data.frame(row.names = seq_len(n))
+
+# Opti
+res = optisure(X, Y, N=20, B=10, alpha = 0.5)
+
+plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
+     xlim = c(-8,8), ylim = c(-10,6))
+points(Y, col = "grey")
+points(res$Y, type = 'b', col = "blue", lwd = 3)
+
+#X quali----
 d2 = 2
 lev = sample(x = 2:4, d2, replace = TRUE)
-X2 <- lapply(seq_len(d2), function(k){
-  data.frame(as.factor(sample(x = seq_len(lev[k]), size = n, replace = TRUE)))
-}) \%>\% bind_cols()
+X2 <- sapply(seq_len(d2), function(k){
+  as.factor(sample(x = seq_len(lev[k]), size = n, replace = TRUE))
+}) \%>\% as.data.frame()
 colnames(X2) = paste0("X", (d1+1):(d1+d2))
 
 X = cbind(X1, X2)
 head(X)
 
 #calcul des Y selon une relation lineaire + du bruit
-p = 2
-ff = lapply(seq_len(p), function(j){
+fn = lapply(seq_len(p), function(j){
   beta = runif(n = (d1 + sum(lev-1)), min = -2, max = 2)
   function(X) {
     is_num = sapply(X, is.numeric)
@@ -49,14 +86,14 @@ ff = lapply(seq_len(p), function(j){
     as.matrix(X) \%*\% beta
   }
 })
-names(ff) = paste0("Y", seq_len(p))
+names(fn) = paste0("Y", seq_len(p))
 
-Y = lapply(ff, function(f){
-  f(X) + rnorm(n)
-}) \%>\% as.data.frame(row.names = seq_len(n))
+#opti
+res = optisure(X, Y, N=20, B=10, alpha = 0.5)
 
-optisure(X, Y, sens = rep("min", p), alpha = 0.5)
-
-plot(res$Y \%>\% arrange(Y1), 'b')
+plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
+     xlim = c(-8,8), ylim = c(-10,6))
+points(Y, col = "grey")
+points(res$Y, type = 'b', col = "blue", lwd = 3)
 
 }

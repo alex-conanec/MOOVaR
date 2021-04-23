@@ -15,7 +15,7 @@ colnames(X1) = paste0("X", seq_len(d1))
 X = X1
 
 #calcul des Y selon une relation lineaire + du bruit
-p = 2
+p = 4
 fn = lapply(seq_len(p), function(j){
   beta = runif(n = d1, min = -2, max = 2)
   function(X) {
@@ -28,8 +28,8 @@ Y = lapply(fn, function(f){
   f(X) #+ rnorm(n)
 }) %>% as.data.frame(row.names = seq_len(n))
 
-cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
-               c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
+# cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
+#                c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
 
 g_cstr = list(
   function(x){
@@ -37,7 +37,23 @@ g_cstr = list(
     x[,1] + x[,2] + x[,3] < 2
   }
 )
-res = optisure(X, Y, fn = cost_fn, alpha = 0.05, g = g_cstr, X_space_csrt=T, B = 10)
+
+# res = optisure(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
+#                g = NULL, X_space_csrt=T, B = 20)
+# plot(res)
+res = optisure(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
+               g = NULL, X_space_csrt=T, B = 20, penalty = rep(0.05, 2),
+               sens = rep("min", length(Y)),
+               utility_risk = c("quantile", "expect", "quantile", "expect"))
+plot(res)
+
+YY = Y %>% mutate(c1 = -Y1, c2 = Y1 + 2*Y2) %>% select(c1, c2)
+res = optisure(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
+               g = NULL, X_space_csrt=T, B = 20)
+plot(res)
+
+res = optisure(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
+               g = NULL, X_space_csrt=T, B = 20)
 plot(res)
 
 

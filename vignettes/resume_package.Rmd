@@ -1,0 +1,234 @@
+---
+title: "Résumé package"
+author: "Alexandre Conanec"
+date: "11/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(optisure)
+```
+
+## Input
+
+- une matrice de $d$ covariables $\bf X$ de dimension $n\times d$
+- une matrice de $p$ variables dependantes $\bf Y$. $y_j = f({\bf x}) + \epsilon$
+- une liste de $K$ fonctions de cout/profit
+- une liste de contraintes (pas trop difficile à satisfaire)
+- un niveau de risque $\alpha$ que le décideur est près à prendre
+
+## Objectif
+
+- Trouver les solutions $\mathcal{P}^*$ qui optimisent les fonctions de coût/profit.
+- $K > 1$ donc il n'existe pas une seule valeur optimale mais des compromis --> front de pareto noté $\mathcal{PF}^*$
+- Les solutions doit respecter les contraintes fixées par le décideur.
+- La solution doivent appartenir au voisinage des solutions observées ($\bf X$) pour empêcher l'extrapolation sur des espaces non observés.
+- La front de pareto garanti un compromis atteint avec une probabilité de $1-\alpha$
+
+
+## Methode
+
+\DeclareMathOperator*{\argmin}{argmin}
+- $\mathcal{PF}_\alpha^* = \{(q_\alpha^{(1)}({\bf x}), \dots, q_\alpha^{(p)}({\bf x})) | {\bf x} \in \mathcal{P}_\alpha^*\} ~~~\text{où}~~~ \mathcal{P}_\alpha^* = \argmin\limits_{{\bf x} \in \mathcal{X}} ( q_\alpha^{(1)}({\bf x}), \dots, q_\alpha^{(p)}({\bf x}) ).$
+
+- Estimation des quantiles conditionnelles :
+  - non paramétrique avec un noyau de lissage de Nadaraya-Watson
+  - paramétrique avec un modèle polynomiale minimisant $\sum\limits_{i=1}^n \rho_{1-\alpha}(y_i-\beta \tilde{{\bf x}})$ où
+  $\rho_p(u) = pu\mathbb{1}_{u \geq 0} - (1-p)u\mathbb{1}_{u < 0}$
+
+- la contrainte ${\bf x} \in \mathcal{X}$ est respecter lorsque $Pr[{\bf x} \in \mathcal{X}] > 0.05$ où $\mathcal{X}$ est estimé avec la densité de ${\bf X}$.
+
+- La convergence vers le front de pareto est obtenu grâce à l'algorithme génétique NSGA II.
+
+## Exemples
+
+### X quanti et pas de contrainte pour éviter l'extrapolation
+
+Scénario ou il y a $d_1=3$ variables quantitatives, un bruit $\epsilon \sim \mathcal{N}(0, 0.5)$ et ou l'espace de décision est juste borné par les minima et maxima de $\bf X$.   
+
+```{r data quanti non contraint}
+set.seed(123)
+d1 = 3
+n = 300
+mini <- rep(x = -2, times = d1)
+maxi <- rep(x = 2, times = d1)
+X1 <- sapply(seq_len(d1), function(k){
+  runif(n = n, min = mini[k], max = maxi[k])
+}) %>% as.data.frame()
+colnames(X1) = paste0("X", seq_len(d1))
+
+#calcul des Y selon une relation lineaire + du bruit
+p = 2
+fn = lapply(seq_len(p), function(j){
+  beta = runif(n = d1, min = -2, max = 2)
+  function(X) {
+    as.matrix(X) %*% beta
+  }
+})
+names(fn) = paste0("Y", seq_len(p))
+
+Y = lapply(fn, function(f){
+  f(X1) + rnorm(n, sd = 0.5)
+}) %>% as.data.frame(row.names = seq_len(n))
+```
+
+Définition des contraintes et de deux fonctions de coût.
+
+```{r definition1}
+cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
+               c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
+
+g_cstr = list(
+  function(x){
+    x = as.data.frame(x)
+    x[,1] + x[,2] + x[,3] < 2
+  }
+)
+```
+
+Résolution pour alpha = 0.5 avec une estimation paramétrique des quantiles.
+
+```{r resolution1, include=FALSE}
+res = optisure(X1, Y, fn = cost_fn, alpha = 0.75, g = g_cstr, 
+               X_space_csrt = FALSE, B = 20, parametric = TRUE)
+```
+
+```{r plot1}
+plot(res)
+```
+
+### X quanti et contrainte pour éviter l'extrapolation
+
+```{r data quanti contraint}
+set.seed(12)
+d1 = 3
+n = 300
+
+b = matrix(c(-2, -2, -2, 0, 0, 0), byrow = T, ncol = d1)
+B = matrix(c(0, 0, 0, 2, 2, 2), byrow = T, ncol = d1)
+nb_foyer = NROW(B)
+X1 = sapply(seq_len(d1), function(i){
+    sapply(seq_len(nb_foyer), function(k){
+      runif(n/nb_foyer, b[k,i], B[k,i])
+    })
+  })
+
+plot(as.data.frame(X1)
+#calcul des Y selon une relation lineaire + du bruit
+p = 2
+fn = lapply(seq_len(p), function(j){
+  beta = runif(n = d1, min = -2, max = 2)
+  function(X) {
+    as.matrix(X) %*% beta
+  }
+})
+names(fn) = paste0("Y", seq_len(p))
+
+Y = lapply(fn, function(f){
+  f(X1) + rnorm(n, sd = 0.5)
+}) %>% as.data.frame(row.names = seq_len(n))
+```
+
+Définition des contraintes et de deux fonctions de coût.
+
+```{r definition2}
+cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
+               c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
+
+g_cstr = list(
+  function(x){
+    x = as.data.frame(x)
+    x[,1] + x[,2] + x[,3] < 2
+  }
+)
+```
+
+Résolution pour alpha = 0.5 avec une estimation paramétrique des quantiles.
+
+```{r resolution2, include=FALSE}
+res = optisure(X=X1, Y, fn = cost_fn, alpha = 0.5, g = g_cstr, 
+               X_space_csrt = TRUE, B = 40, parametric = TRUE)
+```
+
+```{r plot2}
+plot(res)
+```
+
+On peut être surpris, mais en faite si on n'a l'impression que le front n'est pas optimale c'est parce que la contrainte fixé par le décideur empeche d'aller plus bas. Si on enleve cette contrainte :
+
+```{r resolution2_without_cstr, include=FALSE}
+res = optisure(X=X1, Y, fn = cost_fn, alpha = 0.5, g = NULL, 
+               X_space_csrt = TRUE, B = 40, parametric = TRUE)
+```
+
+```{r plot2_without_cstr}
+plot(res)
+```
+
+### X quali
+
+```{r data quali}
+set.seed(12345)
+d2 = 2
+lev = sample(x = 2:4, d2, replace = TRUE)
+X2 <- sapply(seq_len(d2), function(k){
+  as.factor(sample(x = seq_len(lev[k]), size = n, replace = TRUE))
+}) %>% as.data.frame()
+colnames(X2) = paste0("X", (d1+1):(d1+d2))
+
+X = cbind(X1, X2)
+
+#calcul des Y selon une relation lineaire + du bruit
+fn = lapply(seq_len(p), function(j){
+  beta = runif(n = (d1 + sum(lev-1)), min = -2, max = 2)
+  function(X) {
+    is_num = sapply(X, is.numeric)
+    X1 = X[, is_num]
+    X2 = X[, !is_num]
+    X2 = model.matrix(~., data = X2)[,-1]
+    X = cbind(X1, X2)
+    as.matrix(X) %*% beta
+  }
+})
+names(fn) = paste0("Y", seq_len(p))
+
+Y = lapply(fn, function(f){
+  f(X) + rnorm(n, sd = 0.5)
+}) %>% as.data.frame(row.names = seq_len(n))
+```
+
+Définition des contraintes et de deux fonctions de coût.
+
+```{r definition3}
+cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
+               c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
+
+g_cstr = list(
+  function(x){
+    x = as.data.frame(x)
+    x[,1] + x[,2] + x[,3] < 2
+  }
+)
+```
+
+Résolution pour alpha = 0.5 avec une estimation paramétrique des quantiles.
+
+```{r resolution3, include=FALSE}
+res = optisure(X, Y, fn = cost_fn, alpha = 0.5, g = NULL, 
+               X_space_csrt = TRUE, B = 40, parametric = TRUE)
+```
+
+```{r plot3}
+plot(res)
+```
+## Discussion
+
+Pour le modele de regression quantile
+- selection de variable ?
+- compromis variance/bias -> cross validation ? 
+
+Pas de prise en compte de l'incertitude de l'impact des variables quali sur Y avec ce modele
