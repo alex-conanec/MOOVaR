@@ -16,36 +16,26 @@
 #' sum(1:10)
 #' @export
 
-pairwise_comparison <- function(X, sens){
+pairwise_comparison = function(X, sens = rep("min", NCOL(X))){
 
-    if (any(!sens %in% c("min", "max"))) stop("sens must be either 'min' or 'max'")
+  if (any(!sens %in% c("min", "max"))) stop("sens must be either 'min' or 'max'")
 
-    A = array(as.matrix(X), dim = c(NROW(X), NCOL(X), NROW(X)))
-    A_T = apply(A, c(3,1), t)
-    B = apply(A, c(2,1,3), function(x) x)
-    m = B - A_T
+  X = sweep(X, 2, sapply(sens, function(x) ifelse(x == "max", -1, 1)), "*")
 
+  A = array(as.matrix(X), dim = c(dim(X), NROW(X)))
+  d = A - apply(A, 3:1, function(x) x)
 
-    min_dom_strict = apply((m < 0)[which(sens == "min"),, ,drop = FALSE], 2:3, any)
-    min_dom_eq = apply((m <= 0)[which(sens == "min"),, ,drop = FALSE], 2:3, all)
+  #dominate a least one component j and is not dominated on any
+  dom = apply(d > 0, c(1,3), any) & !apply(d < 0, c(1,3), any)
 
-    max_dom_strict = apply((m > 0)[which(sens == "max"),, ,drop = FALSE], 2:3, any)
-    max_dom_eq = apply((m >= 0)[which(sens == "max"),, ,drop = FALSE], 2:3, all)
+  res = lapply(seq_len(NROW(X)), function(i){
+    list(
+      dominating_index = which(dom[,i]),
+      dominated_count = length(which(dom[i,]))
+    )
+  })
 
-    if (all(sens == "min")){
-      dom = min_dom_strict & min_dom_eq
-    }else if (all(sens == "max")){
-      dom = max_dom_strict & max_dom_eq
-    }else{
-      dom = (min_dom_strict | max_dom_strict) & max_dom_eq & min_dom_eq
-    }
-
-    lapply(seq_len(NROW(X)), function(i){
-        list(
-            dominating_index = which(dom[i,]),
-            dominated_count = length(which(dom[,i]))
-            )
-    })
+  res
 
 }
 
