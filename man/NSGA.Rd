@@ -9,13 +9,20 @@ NSGA(
   fn,
   n_objective,
   sens = rep("min", n_objective),
-  N = round(NROW(X)/2, 0),
+  N = NROW(X),
   g = NULL,
-  crossing_over_size = round(NCOL(X)/2),
-  freq_mutation = rep(1/NCOL(X), NCOL(X)),
+  k_tournament,
+  n_echange = 1,
+  n_bloc = 2,
+  crossing_over_method = "uniforme",
+  mutation_method = "simple",
+  freq_m = 0.2,
+  type_var = NULL,
+  distri_Xi = NULL,
   seed = NULL,
-  B = 50,
-  verbose = TRUE
+  TT = 50,
+  verbose = TRUE,
+  front_tracking = TRUE
 )
 }
 \arguments{
@@ -24,14 +31,14 @@ NSGA(
 \item{N}{the size of the population P before the generation of individus.
 By default N=NROW(X)/2}
 
+\item{ff}{a list of list containing the function or predicting model and
+if the objectif function should be maximise "max" or minimize "min"}
+
 \item{crossing_over_size}{number of variable to switch when doing the
 crossing over}
 
 \item{freq_mutation}{a vector of numerics value varying from 0 to 1 which
 represent the frequency of mutation of each variable}
-
-\item{ff}{a list of list containing the function or predicting model and
-if the objectif function should be maximise "max" or minimize "min"}
 }
 \value{
 a vecteur of rank associated with the individus of X

@@ -131,8 +131,8 @@ optisure <- function(X, Y, sens = rep("min", NCOL(Y)),
 
 
   #tunage nsga parametres
-  if (is.null(N)) N = 50 ############
   if (is.null(B)) B = 20
+  if (is.null(N)) N = NROW(X)
 
   if (X_space_csrt){
     cat("Train belonging to density constraint \n")
@@ -141,10 +141,38 @@ optisure <- function(X, Y, sens = rep("min", NCOL(Y)),
 
 
   #appelle de NSGA ou optim si NCOL(Y)==1
-  res = NSGA(X = X, fn = m, n_objective = p, g=g,
-             sens = rep("max", p),
-             N = N, seed = seed,
-             B = B, verbose = TRUE)
+  # res = NSGA(X = X, fn = m, n_objective = p, g=g,
+  #            sens = rep("max", p),
+  #            N = N, seed = seed,
+  #            B = B, verbose = TRUE)
+
+  res = NSGA(
+    X = X,
+    fn = m,
+    n_objective = p,
+    sens = rep("max", p),
+
+    #k tournois
+    k_tournament = 10,
+
+    #crossing over
+    crossing_over_method = "uniforme",
+    n_echange = 2,
+    n_bloc = 2,
+
+    #mutation
+    mutation_method = "mixte",
+    freq_m = 0.3,
+
+    #budget
+    N = N,
+    TT = B,
+
+    #verbose
+    verbose = TRUE,
+    front_tracking = TRUE,
+    seed = seed
+  )
 
   #mise en forme des resultats
   if (globale_tau){

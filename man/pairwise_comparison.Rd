@@ -4,7 +4,7 @@
 \alias{pairwise_comparison}
 \title{Pairwise comparison}
 \usage{
-pairwise_comparison(X, sens)
+pairwise_comparison(X, sens = rep("min", NCOL(X)))
 }
 \arguments{
 \item{X}{a matrix/data.frame of all the selected individus evaluation}

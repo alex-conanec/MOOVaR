@@ -14,7 +14,8 @@ Imports:
     magrittr,
     processx,
     tidyr,
-    plotly
+    plotly,
+    purrr
 Suggests:
     knitr,
     rmarkdown,

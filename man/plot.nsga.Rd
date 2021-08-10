@@ -4,7 +4,7 @@
 \alias{plot.nsga}
 \title{plot nsga}
 \usage{
-\method{plot}{nsga}(res, alpha_ellipse = NULL)
+\method{plot}{nsga}(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1)
 }
 \description{
 plot nsga

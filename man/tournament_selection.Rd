@@ -4,7 +4,7 @@
 \alias{tournament_selection}
 \title{Tournement selection}
 \usage{
-tournament_selection(Y, N)
+tournament_selection(Y, k, N = NROW(Y))
 }
 \arguments{
 \item{N}{size of the Qt population to generate}

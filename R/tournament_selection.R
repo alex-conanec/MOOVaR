@@ -11,18 +11,32 @@
 #' @examples
 #' sum(1:10)
 #' @export
+tournament_selection <- function(Y, k, N = NROW(Y)){
 
-tournament_selection <- function(Y, N){
+    # k = 4
+    # N=30
+    # p=2
+    # Y = matrix(runif(N*p), ncol = p, nrow = N)
+    # Y = as.data.frame(Y)
+    # Y$rank = dominance_ranking(Y, sens = rep("min", 2))
+    # Y$id = 1:N
+    # Y = crowding_distance(Y)
 
-    a = matrix(sample(1:N, 2*N, replace = TRUE), ncol = 2, byrow = T, nrow = N)
+    idx = matrix(sample(1:NROW(Y), k*N, replace = TRUE), ncol = k,
+               byrow = TRUE, nrow = N)
 
-    diff_rank = Y$rank[a[,1]] - Y$rank[a[,2]]
+    apply(idx, 1, function(x){
+        A = matrix(Y[x,]$rank, ncol = k, nrow = k, byrow = TRUE)
+        have_best_rank = apply(A - t(A) <= 0, 2, all)
+        if (sum(have_best_rank) > 1){
+            k_exeaquo = sum(have_best_rank)
+            B = matrix(Y[x,][have_best_rank, ]$crowding_distance,
+                       ncol = k_exeaquo, nrow = k_exeaquo, byrow = TRUE)
+            have_best_CD = apply(B - t(B) >= 0, 2, all)
+            Y[x,][have_best_rank, ][have_best_CD,]$id[1]
+        }else{
+            Y[x,][have_best_rank, ]$id
+        }
+    }) %>% unlist()
 
-    equal = diff_rank == 0
-
-    diff_crowding_distance = Y$crowding_distance[a[,1]] - Y$crowding_distance[a[,2]]
-
-    matrix(c(a[diff_rank < 0, 1], a[diff_rank > 0, 2],
-             a[diff_crowding_distance >= 0 & equal, 1], a[diff_crowding_distance < 0 & equal, 2]),
-           ncol = 2, byrow = TRUE)
 }
