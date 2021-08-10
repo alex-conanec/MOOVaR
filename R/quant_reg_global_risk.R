@@ -1,5 +1,5 @@
 #' @export
-quant_reg_global_risk = function(X, Y, tau, floor = 0.1, max_iter = 20, ...){
+quant_reg_global_risk = function(X, Y, tau, floor = 5/NROW(X), max_iter = 20, ...){
 
   p = NCOL(Y)
   n = NROW(Y)
