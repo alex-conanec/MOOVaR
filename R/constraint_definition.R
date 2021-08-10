@@ -59,7 +59,10 @@
 #' A_estime
 #' (A_estime - A_true_uni)/A_true_uni #ratio
 #'
+#' @import solitude
 #' @export
+
+
 
 def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1, non ?
 
@@ -72,7 +75,7 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
   d2 = sum(is_fac)
   n = NROW(X)
 
-  fit_density = function(X, alpha){
+  novelty_detection = function(X, alpha){
 
     cst_col = sapply(X, function(x) length(unique(x)) == 1)
     if (any(cst_col)){
@@ -82,43 +85,18 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
       values_cst = NULL
     }
 
+    #isolation forest
+    iforest <- isolationForest$new(sample_size = NROW(X),
+                                   num_trees = 1000)
+    iforest$fit(dataset = X)
+    pred_train = iforest$predict(X)
+    threshold = quantile(pred_train$anomaly_score, 1 - alpha)
 
-    #reduction dimensionnelle pour que NCOL(X) <= 6
-    eig = eigen(cor(X))
-    P = eig$vectors
-    ncp_max = length(eig$values)
-    ncp = min(6, ncp_max)
-
-    if (ncp < ncp_max){
-      cat("Perte de", 100*round(sum(eig$values[(ncp + 1):ncp_max])/sum(eig$values), 2),
-          "% d'information pour verifier contrainte d'appartenance a X ronde \n" )
-    }
-
-    #reduction de X
-    mean_X = sapply(X, mean)
-    s_X = sapply(X, sd)
-    mean_mat = matrix(mean_X, ncol = length(mean_X),
-                      nrow=nrow(X), byrow = TRUE)
-    s_mat = matrix(s_X, ncol = length(mean_X),
-                   nrow=nrow(X), byrow = TRUE)
-    Z = as.matrix((X - mean_mat)/s_mat)
-
-    #changement de base
-    A = (Z %*% P)[,seq_len(ncp)]
-
-    H = ks::Hpi(x = A)
-    fhat = ks::kde(x = A, H=H, eval.points = A)$estimate
-    threshold = quantile(fhat, probs = alpha)
 
     list(
-      A = A,
-      P = P, #matrice de passage
-      ncp = ncp, #nb d'axe conserves
-      mean_X = mean_X,
-      s_X = s_X,
       cst_col = cst_col,
       values_cst = values_cst,
-      H = H,
+      iforest = iforest,
       threshold = threshold
     )
   }
@@ -133,7 +111,7 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
     lapply(seq_len(K), function(k){
       mask = sapply(seq_len(n), function(i) all(X[i, is_fac, drop = FALSE] == combinaison[k,]))
       X_num = X[mask, !is_fac]
-      res = fit_density(X=X_num, alpha = alpha/K)
+      res = novelty_detection(X=X_num, alpha = alpha) #/K
 
       res$combi = combinaison[k,]
       res$mask = mask
@@ -141,7 +119,7 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
     }) -> res
 
   }else{
-    res = fit_density(X, alpha)
+    res = novelty_detection(X, alpha)
   }
 
   g = function(x, res, d){
@@ -149,7 +127,7 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
     if (NCOL(x) < d){
       x = matrix(x, ncol = d)
     }
-    x = data.frame(x)
+    x = as.data.frame(x)
     n = NROW(x)
     id = seq_len(n)
 
@@ -179,22 +157,13 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
             if (any(res_k$cst_col)){
               res_cst = x[mask,!is_fac][,res_k$cst_col, drop=FALSE] == #a checker quand il ya plus d'une cst
                 matrix(res_k$values_cst, nrow = n_k,
-                     ncol = length(res_k$values_cst), byrow = T)
+                       ncol = length(res_k$values_cst), byrow = T)
               x = x[mask,!is_fac][,!res_k$cst_col]
             }else{
               x = x[mask, !is_fac]
             }
 
-            #changement de base
-            mean_mat = matrix(res_k$mean_X, ncol = length(res_k$mean_X),
-                              nrow=nrow(x), byrow = TRUE)
-            s_mat = matrix(res_k$s_X, ncol = length(res_k$mean_X),
-                           nrow=nrow(x), byrow = TRUE)
-            x_scale = as.matrix((x - mean_mat)/s_mat)
-            x_new = (x_scale %*% res_k$P)[,seq_len(res_k$ncp)]
-
-            feasible = ks::kde(x = res_k$A, H = res_k$H,
-                               eval.points = x_new)$estimate > res_k$threshold
+            feasible = res_k$iforest$predict(x)$anomaly_score <= res_k$threshold
 
             data.frame(
               id = id[mask],
@@ -208,23 +177,8 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
 
       }else{ #que des quanti
 
-        # #check cst #normalement il faut pas introduire de cst dans les X !!!
-        # res_cst = rep(TRUE, NROW(x))
-        # if (any(res$cst_col)){
-        #   res_cst = apply(
-        #     sapply(res$cst_col, function(j) x[,j] == res$values_cst[j]),
-        #     1, all)
-        # }
+        res$iforest$predict(x)$anomaly_score <= res$threshold
 
-        #changement de base
-        mean_mat = matrix(res$mean_X, ncol = length(res$mean_X),
-                          nrow=nrow(x), byrow = TRUE)
-        s_mat = matrix(res$s_X, ncol = length(res$mean_X),
-                       nrow=nrow(x), byrow = TRUE)
-        x_scale = as.matrix((x - mean_mat)/s_mat)
-        x_new = (x_scale %*% res$P)[,seq_len(res$ncp)]
-
-        ks::kde(x = res$A, H = res$H, eval.points = x_new)$estimate > res$threshold
       }
 
     }else{ #que des quali
@@ -261,8 +215,11 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
   class(res) = "combi_space"
   res
 
-
 }
+
+
+
+
 
 
 
