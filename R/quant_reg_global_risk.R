@@ -1,5 +1,5 @@
 #' @export
-quant_reg_global_risk = function(X, Y, tau, floor = 5/NROW(X), max_iter = 20, ...){
+quant_reg_global_risk = function(X, Y, tau, floor = 5/NROW(X), max_iter = 20){
 
   p = NCOL(Y)
   n = NROW(Y)
@@ -11,7 +11,7 @@ quant_reg_global_risk = function(X, Y, tau, floor = 5/NROW(X), max_iter = 20, ..
   }
 
   for (t in seq_len(max_iter)){
-    m = fit_model(X, Y, tau + lambda, method = "quantile", ...)
+    m = fit_model(X, Y, tau = tau + lambda, method = "quantile")
 
     #eval
     delta = Y - m(X)
