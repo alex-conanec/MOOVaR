@@ -15,7 +15,8 @@ Imports:
     processx,
     tidyr,
     plotly,
-    purrr
+    purrr,
+    solitude
 Suggests:
     knitr,
     rmarkdown,
