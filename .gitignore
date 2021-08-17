@@ -5,3 +5,6 @@
 .Rbuildignore
 dev/
 .Rproj.user
+*.RDS
+simu
+vignettes_pas_pretes

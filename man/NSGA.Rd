@@ -22,7 +22,8 @@ NSGA(
   seed = NULL,
   TT = 50,
   verbose = TRUE,
-  front_tracking = TRUE
+  front_tracking = TRUE,
+  updateProgress = NULL
 )
 }
 \arguments{

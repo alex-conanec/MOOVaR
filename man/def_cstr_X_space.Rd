@@ -4,7 +4,7 @@
 \alias{def_cstr_X_space}
 \title{def_cstr_X_space}
 \usage{
-def_cstr_X_space(X, alpha = 0.05)
+def_cstr_X_space(X, alpha = 0.15)
 }
 \description{
 Find the space where points where observed. Send back a function to check if

@@ -7,16 +7,17 @@
 optisure(
   X,
   Y,
-  sens = rep("min", NCOL(Y)),
-  utility_risk = rep("quantile", NCOL(Y)),
+  sens = rep("max", NCOL(Y)),
+  quantile_utility_idx = rep(TRUE, NCOL(Y)),
   g = NULL,
   X_space_csrt = TRUE,
-  tau = 0.5,
-  globale_tau = FALSE,
-  reg_method = "linear",
+  tau = rep(0.5, NCOL(Y)),
+  globale_tau = rep(F, NCOL(Y)),
+  alpha = 0.15,
   N = NULL,
-  B = NULL,
+  TT = NULL,
   seed = NULL,
+  updateProgress = NULL,
   ...
 )
 }
@@ -56,7 +57,7 @@ Y = lapply(fn, function(f){
 }) \%>\% as.data.frame(row.names = seq_len(n))
 
 # Opti
-res = optisure(X, Y, N=20, B=10, alpha = 0.5)
+res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 
 plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
      xlim = c(-8,8), ylim = c(-10,6))
@@ -89,7 +90,7 @@ fn = lapply(seq_len(p), function(j){
 names(fn) = paste0("Y", seq_len(p))
 
 #opti
-res = optisure(X, Y, N=20, B=10, alpha = 0.5)
+res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 
 plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
      xlim = c(-8,8), ylim = c(-10,6))
