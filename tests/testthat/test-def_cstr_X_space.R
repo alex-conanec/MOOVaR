@@ -100,7 +100,10 @@ test_that("it work well with quali", {
     as.factor(sample(x = LETTERS[seq_len(lev[k])], size = n, replace = TRUE))
   }) %>% as.data.frame()
 
-  res = def_cstr_X_space(X = cbind(X_U, X2), alpha = 0.05)
+  X = data.frame(X_U, X2)
+  colnames(X) = paste0("X", 1:NCOL(X))
+
+  res = def_cstr_X_space(X = X, alpha = 0.15)
 
   #test visuel
   moda = LETTERS[2] #changer jusqu'a 5
@@ -122,10 +125,12 @@ test_that("it work well with quali", {
     as.factor(sample(x = LETTERS[seq_len(lev[k])], size = n, replace = TRUE))
   }) %>% as.data.frame()
 
-  res = def_cstr_X_space(X = cbind(X_U, X2), alpha = 0.05)
+  X = data.frame(X_U, X2)
+  colnames(X) = paste0("X", 1:NCOL(X))
+  res = def_cstr_X_space(X = X, alpha = 0.15)
 
   #test visuel
-  moda = c("A", "B", "A")  #changer jusqu'a 5
+  moda = c("B", "B", "A")  #changer jusqu'a 5
   X = data.frame(X_U, X2) %>% filter(V1 == moda[1] & V2 == moda[2] & V3 == moda[3])
   X_f = data.frame(X_MC, V1 = moda[1], V2 = moda[2], V3 = moda[3])
   plot(X_f[,1:2], col = c("red", "green")[as.numeric(res$g(X_f) + 1)] )
