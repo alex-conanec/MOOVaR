@@ -1,6 +1,6 @@
 
 #' @export
-fit_model = function(X, Y, reg_method, tau = NULL, method = "quantile", penalty = NULL){
+fit_model = function(X, Y, reg_method = "linear", tau = NULL, method = "quantile", penalty = NULL){
   p = NCOL(Y)
   X_mat = model.matrix(~., X)[,-1]
   if (length(tau) == 1 ) tau = rep(tau, p)
