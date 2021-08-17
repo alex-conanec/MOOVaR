@@ -55,7 +55,12 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
                  freq_m=0.2,
                  type_var = NULL,
                  distri_Xi = NULL,
-                 seed = NULL, TT=50, verbose = TRUE, front_tracking = TRUE){
+                 seed = NULL, TT=50, verbose = TRUE, front_tracking = TRUE,
+                 updateProgress = NULL){
+
+    if (is.function(updateProgress)) {
+        updateProgress(detail = paste0("NSGA init"))
+    }
 
     all_front = NULL
 
@@ -66,7 +71,7 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
     if (is.null(distri_Xi)){
         distri_Xi <- lapply(X, function(x){
             if (class(x) == "numeric"){
-                list(min = floor(min(x)), max = round(max(x)),
+                list(min = floor(min(x)), max = ceiling(max(x)),
                      mean = mean(x), sd = sd(x))
             }else if (class(x) == "factor"){
                 list(levels = levels(x))
@@ -83,9 +88,9 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
         feasible = sapply(g, function(gg){
             gg(X)
         })
-        if (K > 1){
-            feasible = apply(feasible, 1, all)
-        }
+        # if (K > 1){
+        feasible = apply(feasible, 1, all)
+        # }
         X = X[feasible,]
 
         threshold = 5
@@ -105,7 +110,7 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
     }
 
     # X = X[1:min(2*N, NROW(X)), ]
-
+    X = head(X, N)
     time_deb <- Sys.time()
 
     # 1) evaluate the function at X
@@ -115,6 +120,10 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
 
 
     for (t in 1:TT){
+
+        if (is.function(updateProgress)) {
+            updateProgress(detail = paste0("NSGA, pop: ", t))
+        }
 
         # while not generate new feasible possible solution
         res_X_C = NULL
@@ -127,6 +136,13 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
             # 3) Pick a couples to be reproduce after a tournement selection
             parents_idx <- tournament_selection(Y, k = k_tournament,
                                                 N = ifelse(N%%2==0, N, N+1))
+
+            # #pas cool, il selectionne que les plus petit index... surement pas les nvx
+            # lapply(1:10, function(s){
+            #     tournament_selection(Y, k = k_tournament,
+            #                          N = ifelse(N%%2==0, N, N+1))
+            # }) %>% unlist() %>% hist()
+
 
             # 4) Generate new individu (Qt) with genetic operator apply on each
             if (crossing_over_method == "uniforme"){
@@ -166,12 +182,13 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
                 feasible = sapply(g, function(gg){
                     gg(X_C)
                 })
-                if (K > 1){
+                # if (K > 1){
                     feasible = apply(feasible, 1, all)
-                }
+                # }
                 res_X_C = rbind(res_X_C, X_C[feasible,])
                 res_param_mut_C = c(res_param_mut_C, param_mut_C[which(feasible)])
                 counter = counter + 1
+                print(NROW(res_X_C))
             }else{
                 res_X_C = X_C
                 res_param_mut_C = param_mut_C
@@ -205,7 +222,6 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
             all_front[[t]] = data.frame(t=t, Y[, 1:n_objective], rank = Y$rank)
         }
 
-
         if (verbose) {
             cat("Population ", t, '\n')
             print(round((Sys.time() - time_deb), 1))
@@ -238,7 +254,8 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
 #'
 #' @export
 
-plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1){
+plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
+                      as_list_plot = FALSE){
 
     library(magrittr)
     if (choice == "PF"){
@@ -300,29 +317,33 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1){
         }) -> p_x
 
 
-        n_y = length(p_y)
-        n_x = length(p_x)
+        if (!as_list_plot){
+            n_y = length(p_y)
+            n_x = length(p_x)
 
-        s_y = plotly::subplot(p_y, titleY = TRUE, titleX = TRUE) #, nrows = ceiling(n_y/3))
-        s_x = plotly::subplot(p_x, titleX = TRUE) #, nrows = ceiling(n_x/10))
+            s_y = plotly::subplot(p_y, titleY = TRUE, titleX = TRUE) #, nrows = ceiling(n_y/3))
+            s_x = plotly::subplot(p_x, titleX = TRUE) #, nrows = ceiling(n_x/10))
 
-        if (is.null(res$tau)){
-            pareto_title = "Pareto front"
+            if (is.null(res$tau)){
+                pareto_title = "Pareto front"
+            }else{
+                pareto_title = paste0("Pareto front (alpha=", res$tau, ")")
+            }
+
+
+            plotly::ggplotly(plotly::subplot(s_y, s_x, nrows = 2, margin = 0.05,
+                                             titleY = TRUE, titleX = TRUE)) %>%
+                plotly::highlight(on = "plotly_selected", off= "plotly_deselect",
+                                  color = "red") %>%
+                plotly::layout(annotations = list(
+                    list(x = 0 , y = 1.05, text = pareto_title,
+                         showarrow = F, xref='paper', yref='paper'),
+                    list(x = 0 , y = 0.48, text = "Decision solution",
+                         showarrow = F, xref='paper', yref='paper'))
+                )
         }else{
-            pareto_title = paste0("Pareto front (alpha=", res$tau, ")")
+            list(p_x = p_x, p_y = p_y, combi_y = combi_y)
         }
-
-
-        plotly::ggplotly(plotly::subplot(s_y, s_x, nrows = 2, margin = 0.05,
-                                         titleY = TRUE, titleX = TRUE)) %>%
-            plotly::highlight(on = "plotly_selected", off= "plotly_deselect",
-                              color = "red") %>%
-            plotly::layout(annotations = list(
-                list(x = 0 , y = 1.05, text = pareto_title,
-                     showarrow = F, xref='paper', yref='paper'),
-                list(x = 0 , y = 0.48, text = "Decision solution",
-                     showarrow = F, xref='paper', yref='paper'))
-            )
 
     }else if (choice == "qlt"){
 
