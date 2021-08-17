@@ -64,7 +64,7 @@
 
 
 
-def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1, non ?
+def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1, non ?
 
   X = as.data.frame(X)
   is_fac = !sapply(data.frame(X), is.numeric)
@@ -77,13 +77,13 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
 
   novelty_detection = function(X, alpha){
 
-    cst_col = sapply(X, function(x) length(unique(x)) == 1)
-    if (any(cst_col)){
-      values_cst = unique(X[,cst_col])
-      X = X[,!cst_col]
-    }else{
-      values_cst = NULL
-    }
+    # cst_col = sapply(X, function(x) length(unique(x)) == 1)
+    # if (any(cst_col)){
+    #   values_cst = unique(X[,cst_col])
+    #   X = X[,!cst_col]
+    # }else{
+    #   values_cst = NULL
+    # }
 
     #isolation forest
     iforest <- isolationForest$new(sample_size = NROW(X),
@@ -94,8 +94,8 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
 
 
     list(
-      cst_col = cst_col,
-      values_cst = values_cst,
+      # cst_col = cst_col,
+      # values_cst = values_cst,
       iforest = iforest,
       threshold = threshold
     )
@@ -151,23 +151,24 @@ def_cstr_X_space <- function(X, alpha = 0.05){ #/!\ pb qd n d'une combi < a p+1,
           if (!is.null(res_idx_k)){ #si le n ind par comb etait suffisant
             res_k = res[[res_idx_k]]
 
-            #check cst
-            n_k = length(which(mask))
-            res_cst = rep(TRUE, n_k)
-            if (any(res_k$cst_col)){
-              res_cst = x[mask,!is_fac][,res_k$cst_col, drop=FALSE] == #a checker quand il ya plus d'une cst
-                matrix(res_k$values_cst, nrow = n_k,
-                       ncol = length(res_k$values_cst), byrow = T)
-              x = x[mask,!is_fac][,!res_k$cst_col]
-            }else{
+            # #check cst
+            # n_k = length(which(mask))
+            # res_cst = rep(TRUE, n_k)
+            # if (any(res_k$cst_col)){
+            #   res_cst = x[mask,!is_fac][,res_k$cst_col, drop=FALSE] == #a checker quand il ya plus d'une cst
+            #     matrix(res_k$values_cst, nrow = n_k,
+            #            ncol = length(res_k$values_cst), byrow = T)
+            #   x = x[mask,!is_fac][,!res_k$cst_col]
+            # }else{
               x = x[mask, !is_fac]
-            }
+            # }
 
             feasible = res_k$iforest$predict(x)$anomaly_score <= res_k$threshold
 
             data.frame(
               id = id[mask],
-              feasible = apply(cbind(feasible, res_cst), 1, all))
+              feasible = feasible)
+              # feasible = apply(cbind(feasible, res_cst), 1, all))
           }else{ #sinon False
             data.frame(id = id[mask], feasible = FALSE)
           }
