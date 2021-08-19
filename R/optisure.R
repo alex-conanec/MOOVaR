@@ -188,7 +188,11 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
     g$cstr_X_space = def_cstr_X_space(X, alpha = alpha)$g
   }
 
-  # print(g)
+  if (any(sapply(X, is.numeric))){
+    mutation_method = "mixte"
+  }else{
+    mutation_method = "simple"
+  }
 
   #appelle de NSGA
   res = NSGA(
@@ -207,7 +211,7 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
     n_bloc = 2,
 
     #mutation
-    mutation_method = "mixte",
+    mutation_method = mutation_method,
     freq_m = 0.3,
 
     #budget
