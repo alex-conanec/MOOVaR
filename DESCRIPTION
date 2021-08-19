@@ -16,7 +16,8 @@ Imports:
     tidyr,
     plotly,
     purrr,
-    solitude
+    solitude,
+    hqreg
 Suggests:
     knitr,
     rmarkdown,
