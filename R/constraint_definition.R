@@ -85,6 +85,12 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
     #   values_cst = NULL
     # }
 
+
+    #reduction dimensionnelle
+    # eig = eigen(cor(X))
+    # P = eig$vectors
+
+
     #isolation forest
     iforest <- isolationForest$new(sample_size = NROW(X),
                                    num_trees = 1000)
