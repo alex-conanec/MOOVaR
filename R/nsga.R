@@ -180,8 +180,9 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
             if (K > 0){
                 cat("check constraint:", counter, "\n")
                 feasible = sapply(g, function(gg){
-                    gg(X_C)
+                    gg(x=X_C)
                 })
+
                 # if (K > 1){
                     feasible = apply(feasible, 1, all)
                 # }
@@ -200,9 +201,9 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
         param_mut = c(param_mut, res_param_mut_C[1:N])
 
         #evaluate the children
-        Y_C = fn(res_X_C) %>% as.data.frame() %>% mutate(id = 1:NROW(.) + N)
+        Y_C = fn(res_X_C) %>% as.data.frame() %>% mutate(id = 1:NROW(.) + NROW(Y))
         Y = bind_rows(Y %>% select(-rank, -crowding_distance) %>%
-                          mutate(id = 1:N),
+                          mutate(id = 1:NROW(Y)),
                       Y_C)
 
         Y$rank = dominance_ranking(Y[,-NCOL(Y)], sens)
@@ -216,7 +217,7 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
         # 5) Gather the Pt and Qt and proceed to the next iteration
         X = bind_rows(X, res_X_C)[Y$id,]
         param_mut = param_mut[Y$id]
-        Y = Y %>% mutate(id = 1:N)
+        Y = Y %>% mutate(id = 1:NROW(Y))
 
         if (front_tracking){
             all_front[[t]] = data.frame(t=t, Y[, 1:n_objective], rank = Y$rank)
