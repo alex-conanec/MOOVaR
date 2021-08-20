@@ -64,7 +64,7 @@
 
 
 
-def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1, non ?
+def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd n d'une combi < a p+1, non ?
 
   X = as.data.frame(X)
   is_fac = !sapply(data.frame(X), is.numeric)
@@ -115,6 +115,9 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
 
     K = NROW(combinaison)
     lapply(seq_len(K), function(k){
+
+      is_it_stopped(path_tracking)
+
       mask = sapply(seq_len(n), function(i) all(X[i, is_fac, drop = FALSE] == combinaison[k,]))
       X_num = X[mask, !is_fac]
       res = novelty_detection(X=X_num, alpha = alpha) #/K
@@ -128,7 +131,7 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
     res = novelty_detection(X, alpha)
   }
 
-  g = function(x, res, d){
+  g = function(x, res, d, path_tracking){
 
     if (NCOL(x) < d){
       x = matrix(x, ncol = d)
@@ -144,6 +147,7 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
         combinaison = unique(x[,is_fac, drop = FALSE])
 
         lapply(seq_len(NROW(combinaison)), function(k){
+          is_it_stopped(path_tracking)
           mask = sapply(seq_len(n), function(i) all(x[i, is_fac, drop = FALSE] == combinaison[k, ,drop = FALSE]))
 
           res_idx_k = sapply(seq_along(res), function(i){
@@ -193,6 +197,8 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
       id = seq_len(n)
       lapply(seq_len(NROW(combinaison)), function(k){
 
+        is_it_stopped(path_tracking)
+
         mask = sapply(seq_len(n), function(i) all(x[i, , drop = FALSE] == combinaison[k, ,drop = FALSE]))
         res_idx_k = sapply(seq_len(NROW(res)), function(i){
           if (all(res[i, , drop = FALSE] == combinaison[k, , drop = FALSE])){
@@ -213,6 +219,7 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
 
   formals(g)$res = res
   formals(g)$d = NCOL(X)
+  formals(g)$path_tracking = path_tracking
 
   res = list(
     g = g,
@@ -231,7 +238,7 @@ def_cstr_X_space <- function(X, alpha = 0.15){ #/!\ pb qd n d'une combi < a p+1,
 
 
 #' @export
-plot.combi_space <- function(res, filtre = NULL){
+plot.combi_space <- function(res, as_list_plot = FALSE){
 
 
   d = NCOL(res$X)
@@ -241,58 +248,52 @@ plot.combi_space <- function(res, filtre = NULL){
   mini = floor(apply(res$X[, is_num], 2, min))
   maxi = ceiling(apply(res$X[, is_num], 2, max))
 
-  n_MC = 5000
-  X_MC = sapply(seq_len(d), function(i){
+  combinaison = unique(res$X[,!is_num])
+  n_MC = 10 ^ sum(is_num)
+  X_quanti_MC = sapply(seq_len(d)[is_num], function(i){
     runif(n_MC, mini[i], maxi[i])
   }) %>% as.data.frame()
 
-  combinaison = unique(res$X[,!is_num])
-  X_MC = cbind(X_MC, combinaison[sample(seq_len(NROW(combinaison)),
-                                        size = n_MC, replace = TRUE), ])
-
-
-
-  if (!is.null(colnames(res$X))){
-    colnames(X_MC) = colnames(res$X)
+  if (any(is_num)){
+    df = lapply(1:NROW(combinaison), function(i){
+      cbind(combinaison[i,], X_quanti_MC)
+    }) %>% bind_rows()
+    df = df[res$g(df),]
   }else{
-    colnames(X_MC) = paste0("X_", seq_along(X_MC))
+    df = combinaison
   }
 
+  df$id = 1:NROW(df)
 
-  if (!is.null(filtre)){
-
-    df_res = X_MC
-    for (x_name in names(filtre)){
-
-      if (is.numeric(res$X[,x_name])){
-        df_res = df_res %>% filter(!!rlang::sym(x_name) > filtre[[x_name]][1] &
-                                         !!rlang::sym(x_name) < filtre[[x_name]][2])
-      }else{
-        df_res = df_res %>% filter(!!rlang::sym(x_name) %in% filtre[[x_name]])
-      }
-
-
+  dd = plotly::highlight_key(df, ~id)
+  lapply(colnames(df)[-NCOL(df)], function(X_i){
+    if (is.numeric(df[, X_i]) | is.integer(df[, X_i])){
+      p = ggplot2::ggplot(dd) +
+        ggplot2::geom_point(ggplot2::aes_string(x = 1, y = X_i)) +
+        ggplot2::xlab(X_i) +
+        ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                       axis.ticks.x = ggplot2::element_blank())
+    }else{
+      p = ggplot2::ggplot(dd) + ggplot2::geom_text(
+        ggplot2::aes(x = 1, y = as.numeric(!! rlang::sym(X_i)),
+                     label = !! rlang::sym(X_i))) +
+        ggplot2::ylim(0.5, nlevels(df[, X_i]) + 0.5) +
+        ggplot2::xlab(X_i) +
+        ggplot2::theme(axis.text = ggplot2::element_blank(),
+                       axis.ticks = ggplot2::element_blank(),
+                       axis.title.y = ggplot2::element_blank())
     }
+    p
+  }) -> p_x
 
+  if (!as_list_plot){
+    plotly::ggplotly(plotly::subplot(p_x, titleX = TRUE)) %>%
+      plotly::highlight(on = "plotly_selected", off= "plotly_deselect",
+                        color = "red")
+  }else{
+    p_x
   }
 
-
-  df_res_num = df_res[,is_num] %>% mutate(id = seq_len(NROW(.)),
-                             feasible = res$g(df_res)) %>%
-        gather(key = X_j, value = coord, -id, - feasible) %>% select(-id) %>%
-    mutate(x = as.numeric(as.factor(X_j)))
-
-  df_res_fac = df_res[,!is_num] %>% mutate(id = seq_len(NROW(.)),
-                                          feasible = res$g(df_res)) %>%
-    gather(key = X_j, value = coord, -id, - feasible) %>% select(-id)
-
-  ggplot(df_res_num, aes(x = x, y = coord)) +
-    facet_wrap(~X_j, "free") +
-    geom_point(aes(colour = feasible ))
-
-  ggplot(df_res_fac, aes(x = X_j, y = coord)) +
-    geom_point(aes(colour = feasible )) +
-    facet_wrap(~X_j) #, "free")
 }
 
 
