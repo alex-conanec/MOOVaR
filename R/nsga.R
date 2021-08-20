@@ -56,11 +56,14 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
                  type_var = NULL,
                  distri_Xi = NULL,
                  seed = NULL, TT=50, verbose = TRUE, front_tracking = TRUE,
-                 updateProgress = NULL){
+                 updateProgress = NULL,
+                 path_tracking = NULL){
 
+    #tracking
     if (is.function(updateProgress)) {
-        updateProgress(detail = paste0("NSGA init"))
+        updateProgress(detail = "NSGA init")
     }
+    tracking_msg(path_tracking, msg = "NSGA init")
 
     all_front = NULL
 
@@ -124,14 +127,25 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
         if (is.function(updateProgress)) {
             updateProgress(detail = paste0("NSGA, pop: ", t))
         }
+        tracking_msg(path_tracking, msg = paste0("NSGA, pop: ", t))
+
 
         # while not generate new feasible possible solution
         res_X_C = NULL
         res_param_mut_C = NULL
         counter = 1
 
+        is_it_stopped(path_tracking)
+
         while (NROW(res_X_C) < N){
 
+            # #tracking stop
+            # if (!is.null(path_tracking)){
+            #     tracking = readRDS(path_tracking)
+            #     if (tracking[[length(tracking)]] == "stop"){
+            #         stop()
+            #     }
+            # }
 
             # 3) Pick a couples to be reproduce after a tournement selection
             parents_idx <- tournament_selection(Y, k = k_tournament,

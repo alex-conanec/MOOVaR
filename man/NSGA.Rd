@@ -23,7 +23,8 @@ NSGA(
   TT = 50,
   verbose = TRUE,
   front_tracking = TRUE,
-  updateProgress = NULL
+  updateProgress = NULL,
+  path_tracking = NULL
 )
 }
 \arguments{

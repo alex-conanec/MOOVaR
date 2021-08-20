@@ -1,6 +1,13 @@
 
 #' @export
-fit_model = function(X, Y, reg_method = "linear", tau = NULL, method = "quantile", penalty = NULL){
+fit_model = function(X, Y, reg_method = "linear", tau = NULL,
+                     method = "quantile", penalty = NULL,
+                     path_tracking = NULL){
+
+
+  #tracking stop
+  is_it_stopped(path_tracking)
+
   p = NCOL(Y)
   X_mat = model.matrix(~., X)[,-1]
   if (length(tau) == 1 ) tau = rep(tau, p)

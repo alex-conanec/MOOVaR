@@ -18,6 +18,7 @@ optisure(
   TT = NULL,
   seed = NULL,
   updateProgress = NULL,
+  path_tracking = NULL,
   ...
 )
 }

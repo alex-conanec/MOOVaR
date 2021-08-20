@@ -83,7 +83,9 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
                      alpha = 0.15,
                      # reg_method = "linear", #rajouté
                      N = NULL, TT = NULL, seed = NULL,
-                     updateProgress = NULL, ...){
+                     updateProgress = NULL,
+                     path_tracking = NULL,
+                     ...){
 
   # library(reticulate)
   d = NCOL(X)
@@ -96,9 +98,12 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
   Y = as.data.frame(Y)
   Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
 
+  #tracking
   if (is.function(updateProgress)) {
     updateProgress(detail = "Training model")
   }
+
+  tracking_msg(path_tracking, msg = "Training model")
 
   if (any(quantile_utility_idx)){
     if (!any(quantile_utility_idx[!globale_tau])){#global risk management only
@@ -107,12 +112,12 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
         stop("tau must be the same for objectif treating in globale risk")
       }
       qrgr = quant_reg_global_risk(X = X, Y[,quantile_utility_idx, drop = FALSE],
-                                   tau = glob_tau)
+                                   tau = glob_tau, path_tracking = path_tracking)
       m_quantile = qrgr$m
     }else if (!any(quantile_utility_idx[globale_tau])){#individual risk management only
       m_quantile = fit_model(X, Y = Y[,quantile_utility_idx, drop = FALSE],
                              tau = tau[quantile_utility_idx],
-                             method = "quantile")
+                             method = "quantile", path_tracking = path_tracking)
     }else{#gobal AND individual risk management
       #global risk
       global_risk_idx = quantile_utility_idx & globale_tau
@@ -121,20 +126,21 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
         stop("tau must be the same for objectif treating in globale risk")
       }
       qrgr = quant_reg_global_risk(X = X, Y = Y[,global_risk_idx, drop = FALSE],
-                                   tau = glob_tau)
+                                   tau = glob_tau, path_tracking = path_tracking)
       m_quantile_glob = qrgr$m
 
       #individual risk
       ind_risk_idx = quantile_utility_idx & !globale_tau
       m_quantile_ind = fit_model(X, Y = Y[,ind_risk_idx, drop = FALSE],
                                  tau = tau[ind_risk_idx],
-                                 method = "quantile")
+                                 method = "quantile",
+                                 path_tracking = path_tracking)
     }
   }
 
   if (any(!quantile_utility_idx)){
     m_expect = fit_model(X, Y = Y[,!quantile_utility_idx, drop = FALSE],
-                         method = "expected")
+                         method = "expected", path_tracking = path_tracking)
   }
 
   if (all(quantile_utility_idx)){
@@ -181,11 +187,16 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
   if (is.null(N)) N = round(NROW(X)/2)
 
   if (X_space_csrt){
+    #tracking
     if (is.function(updateProgress)) {
       updateProgress(detail = "Decision constraint training")
     }
+    tracking_msg(path_tracking, msg = "Decision constraint training")
+
     cat("Train belonging to density constraint \n")
-    g$cstr_X_space = def_cstr_X_space(X, alpha = alpha)$g
+    X_space_csrt = def_cstr_X_space(X, alpha = alpha,
+                                    path_tracking = path_tracking)
+    g$cstr_X_space = X_space_csrt$g
   }
 
   if (any(sapply(X, is.numeric))){
@@ -222,12 +233,14 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
     verbose = TRUE,
     front_tracking = TRUE,
     seed = seed,
-    updateProgress = updateProgress
+    updateProgress = updateProgress,
+    path_tracking = path_tracking
   )
 
   if (is.function(updateProgress)) {
-    updateProgress(detail = paste0("end"))
+    updateProgress(detail = "end")
   }
+  tracking_msg(path_tracking, msg = "End")
 
   #mise en forme des resultats ##### a modifier aussi
   # if (globale_tau){
@@ -247,6 +260,7 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
   res$Y0 = Y
   colnames(res$Y) = colnames(Y)
   res$tau = tau
+  res$X_space_csrt = X_space_csrt
 
   res
 }
