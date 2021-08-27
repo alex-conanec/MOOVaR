@@ -114,7 +114,8 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
       qrgr = quant_reg_global_risk(X = X, Y[,quantile_utility_idx, drop = FALSE],
                                    tau = glob_tau, path_tracking = path_tracking)
       m_quantile = qrgr$m
-    }else if (!any(quantile_utility_idx[globale_tau])){#individual risk management only
+    }else if (!any(quantile_utility_idx[globale_tau]) |
+              sum(quantile_utility_idx[globale_tau]) == 1){#individual risk management only
       m_quantile = fit_model(X, Y = Y[,quantile_utility_idx, drop = FALSE],
                              tau = tau[quantile_utility_idx],
                              method = "quantile", path_tracking = path_tracking)
