@@ -92,12 +92,16 @@ def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd 
 
 
     #isolation forest
-    iforest <- isolationForest$new(sample_size = NROW(X),
-                                   num_trees = 1000)
-    iforest$fit(dataset = X)
-    pred_train = iforest$predict(X)
-    threshold = quantile(pred_train$anomaly_score, 1 - alpha)
+    theta = 0.5
+    train_idx = sample(x = 1:NROW(X), size = theta*NROW(X))
+    X_train1 = X[train_idx,]
+    X_train2 = X[-train_idx,]
 
+    iforest <- isolationForest$new(sample_size = NROW(X_train1),
+                                   num_trees = 1000)
+    iforest$fit(dataset = X_train1)
+    pred_train = iforest$predict(X_train2)
+    threshold = quantile(pred_train$anomaly_score, 1 - alpha)
 
     list(
       # cst_col = cst_col,
@@ -237,6 +241,9 @@ def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd 
 
 
 
+#' @import ggplot2
+#' @importFrom plotly ggplotly highlight subplot highlight_key
+#'
 #' @export
 plot.combi_space <- function(res, as_list_plot = FALSE){
 
@@ -265,31 +272,31 @@ plot.combi_space <- function(res, as_list_plot = FALSE){
 
   df$id = 1:NROW(df)
 
-  dd = plotly::highlight_key(df, ~id)
+  dd = highlight_key(df, ~id)
   lapply(colnames(df)[-NCOL(df)], function(X_i){
     if (is.numeric(df[, X_i]) | is.integer(df[, X_i])){
-      p = ggplot2::ggplot(dd) +
-        ggplot2::geom_point(ggplot2::aes_string(x = 1, y = X_i)) +
-        ggplot2::xlab(X_i) +
-        ggplot2::theme(axis.text.x = ggplot2::element_blank(),
-                       axis.ticks.x = ggplot2::element_blank())
+      p = ggplot(dd) +
+        geom_point(aes_string(x = 1, y = X_i)) +
+        xlab(X_i) +
+        theme(axis.text.x = element_blank(),
+              axis.ticks.x = element_blank())
     }else{
-      p = ggplot2::ggplot(dd) + ggplot2::geom_text(
-        ggplot2::aes(x = 1, y = as.numeric(!! rlang::sym(X_i)),
-                     label = !! rlang::sym(X_i))) +
-        ggplot2::ylim(0.5, nlevels(df[, X_i]) + 0.5) +
-        ggplot2::xlab(X_i) +
-        ggplot2::theme(axis.text = ggplot2::element_blank(),
-                       axis.ticks = ggplot2::element_blank(),
-                       axis.title.y = ggplot2::element_blank())
+      p = ggplot(dd) + geom_text(
+        aes(x = 1, y = as.numeric(!! rlang::sym(X_i)),
+            label = !! rlang::sym(X_i))) +
+        ylim(0.5, nlevels(df[, X_i]) + 0.5) +
+        xlab(X_i) +
+        theme(axis.text = element_blank(),
+              axis.ticks = element_blank(),
+              axis.title.y = element_blank())
     }
-    p
+    p + theme_bw()
   }) -> p_x
 
   if (!as_list_plot){
-    plotly::ggplotly(plotly::subplot(p_x, titleX = TRUE)) %>%
-      plotly::highlight(on = "plotly_selected", off= "plotly_deselect",
-                        color = "red")
+    ggplotly(subplot(p_x, titleX = TRUE)) %>%
+      highlight(on = "plotly_selected", off= "plotly_deselect",
+                color = "red")
   }else{
     p_x
   }
