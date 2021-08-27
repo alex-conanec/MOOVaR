@@ -17,7 +17,8 @@ Imports:
     plotly,
     purrr,
     solitude,
-    hqreg
+    hqreg,
+    ggplot2
 Suggests:
     knitr,
     rmarkdown,
