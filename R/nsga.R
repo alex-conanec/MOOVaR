@@ -266,6 +266,8 @@ NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
 
 
 #' plot nsga
+#' @import ggplot2
+#' @importFrom plotly ggplotly highlight subplot highlight_key
 #'
 #' @export
 
@@ -279,55 +281,53 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
         for (k in which(is_fac)) res$X[,k] = as.factor(res$X[,k])
 
         df = dplyr::bind_cols(res$X, res$Y) %>% dplyr::mutate(id = 1:NROW(.))
-        dd = plotly::highlight_key(df, ~id)
+        dd = highlight_key(df, ~id)
 
         combi_y = combn(colnames(res$Y), 2)
 
         lapply(seq_len(NCOL(combi_y)), function(i){
 
-            p = ggplot2::ggplot(dd) +
-                ggplot2::geom_point(ggplot2::aes_string(x = combi_y[1, i],
-                                                        y = combi_y[2, i]),
-                                    colour = "blue", size = 2) +
-                ggplot2::xlab(combi_y[1, i]) + ggplot2::ylab(combi_y[2, i]) +
-                ggplot2::geom_point(data = res$Y0,
-                                    ggplot2::aes_string(x = combi_y[1, i],
-                                                        y = combi_y[2, i]),
-                                    alpha = 0.3)
+            p = ggplot(dd) +
+                geom_point(aes_string(x = combi_y[1, i], y = combi_y[2, i]),
+                           colour = "blue", size = 2) +
+                xlab(combi_y[1, i]) + ylab(combi_y[2, i]) +
+                geom_point(data = res$Y0,
+                           aes_string(x = combi_y[1, i], y = combi_y[2, i]),
+                           alpha = 0.3)
 
             if (NCOL(res$Y) < 3){
-                p + ggplot2::geom_line(data = df,
-                                       ggplot2::aes_string(x = combi_y[1, i],
-                                                           y = combi_y[2, i]),
-                                       colour = "blue")
+                p + geom_line(data = df,
+                              aes_string(x = combi_y[1, i], y = combi_y[2, i]),
+                              colour = "blue") +
+                    theme_bw()
             }else{
-                p
+                p + theme_bw()
             }
 
         }) -> p_y
 
         lapply(colnames(res$X), function(X_i){
             if (is.numeric(res$X[, X_i]) | is.integer(res$X[, X_i])){
-                p = ggplot2::ggplot(dd) +
-                    ggplot2::geom_point(ggplot2::aes_string(x = 1, y = X_i)) +
-                    ggplot2::xlab(X_i) +
-                    ggplot2::theme(axis.text.x = ggplot2::element_blank(),
-                                   axis.ticks.x = ggplot2::element_blank())
+                p = ggplot(dd) +
+                    geom_point(aes_string(x = 1, y = X_i)) +
+                    xlab(X_i) +
+                    theme(axis.text.x = element_blank(),
+                          axis.ticks.x = element_blank())
             }else{
-                p = ggplot2::ggplot(dd) + ggplot2::geom_text(
-                    ggplot2::aes(x = 1, y = as.numeric(!! rlang::sym(X_i)),
-                                 label = !! rlang::sym(X_i))) +
-                    ggplot2::ylim(0.5, nlevels(res$X[, X_i])+0.5) +
-                    ggplot2::xlab(X_i) +
-                    ggplot2::theme(axis.text = ggplot2::element_blank(),
-                                   axis.ticks = ggplot2::element_blank(),
-                                   axis.title.y = ggplot2::element_blank())
+                p = ggplot(dd) + geom_text(
+                    aes(x = 1, y = as.numeric(!! rlang::sym(X_i)),
+                        label = !! rlang::sym(X_i))) +
+                    ylim(0.5, nlevels(res$X[, X_i])+0.5) +
+                    xlab(X_i) +
+                    theme(axis.text = element_blank(),
+                          axis.ticks = element_blank(),
+                          axis.title.y = element_blank())
             }
 
             # if (NCOL(res$X) > 5){
-            #     p + ggplot2::theme(axis.title.x = ggplot2::element_text(angle = 90))
+            #     p + theme(axis.title.x = element_text(angle = 90))
             # }else{
-            p
+            p + theme_bw()
             # }
         }) -> p_x
 
@@ -336,8 +336,8 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
             n_y = length(p_y)
             n_x = length(p_x)
 
-            s_y = plotly::subplot(p_y, titleY = TRUE, titleX = TRUE) #, nrows = ceiling(n_y/3))
-            s_x = plotly::subplot(p_x, titleX = TRUE) #, nrows = ceiling(n_x/10))
+            s_y = subplot(p_y, titleY = TRUE, titleX = TRUE) #, nrows = ceiling(n_y/3))
+            s_x = subplot(p_x, titleX = TRUE) #, nrows = ceiling(n_x/10))
 
             if (is.null(res$tau)){
                 pareto_title = "Pareto front"
@@ -346,9 +346,9 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
             }
 
 
-            plotly::ggplotly(plotly::subplot(s_y, s_x, nrows = 2, margin = 0.05,
+            ggplotly(subplot(s_y, s_x, nrows = 2, margin = 0.05,
                                              titleY = TRUE, titleX = TRUE)) %>%
-                plotly::highlight(on = "plotly_selected", off= "plotly_deselect",
+                highlight(on = "plotly_selected", off= "plotly_deselect",
                                   color = "red") %>%
                 plotly::layout(annotations = list(
                     list(x = 0 , y = 1.05, text = pareto_title,
