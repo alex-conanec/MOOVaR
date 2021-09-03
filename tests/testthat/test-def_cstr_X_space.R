@@ -1,6 +1,6 @@
 context("def_cstr_X_space")
 library(tidyverse)
-library(optisure)
+library(MOOVaR)
 
 test_that("verifie que l'aire de l'espace contraint est coherent avec une distribution uniform et normal", {
 

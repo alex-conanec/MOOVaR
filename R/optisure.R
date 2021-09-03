@@ -1,4 +1,4 @@
-#' optisure
+#' MOOVaR
 #'
 #' @param X matrix or data.frame of n observation of the decision variable of size d.
 #' @param Y matrix or data.frame of n observation of the p objectifs.
@@ -59,7 +59,7 @@
 #' )
 #'
 #'
-#' res = optisure(X, Y,
+#' res = MOOVaR(X, Y,
 #'                sens = rep("max", NCOL(Y)),
 #'                quantile_utility_idx = c(T,T,T,F),
 #'                tau = rep(0.2, p),
@@ -72,7 +72,7 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
+MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
                      quantile_utility_idx = rep(TRUE, NCOL(Y)),
                      g = NULL, X_space_csrt = TRUE,
                      tau = rep(0.5, NCOL(Y)),

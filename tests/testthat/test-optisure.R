@@ -1,5 +1,5 @@
 library(tidyverse)
-library(optisure)
+library(MOOVaR)
 set.seed(12)
 n <- 300
 
@@ -38,21 +38,21 @@ g_cstr = list(
   }
 )
 
-# res = optisure(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
+# res = MOOVaR(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
 #                g = NULL, X_space_csrt=T, B = 20)
 # plot(res)
-res = optisure(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
+res = MOOVaR(X, Y, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
                g = NULL, X_space_csrt=T, B = 20, penalty = rep(0.05, 2),
                sens = rep("min", length(Y)),
                utility_risk = c("quantile", "expect", "quantile", "expect"))
 plot(res)
 
 YY = Y %>% mutate(c1 = -Y1, c2 = Y1 + 2*Y2) %>% select(c1, c2)
-res = optisure(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
+res = MOOVaR(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "linear",
                g = NULL, X_space_csrt=T, B = 20)
 plot(res)
 
-res = optisure(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
+res = MOOVaR(X, YY, tau = 0.5, globale_tau = FALSE, reg_method = "neural_network",
                g = NULL, X_space_csrt=T, B = 20)
 plot(res)
 
@@ -78,7 +78,7 @@ Y = lapply(fn, function(f){
   f(X) #+ rnorm(n)
 }) %>% as.data.frame(row.names = seq_len(n))
 
-res = optisure(X, Y, fn = cost_fn, alpha = 0.5, g = g_cstr, X_space_csrt=T,
+res = MOOVaR(X, Y, fn = cost_fn, alpha = 0.5, g = g_cstr, X_space_csrt=T,
                B = 20, parametric = TRUE)
 plot(res)
 
@@ -110,7 +110,7 @@ names(fn) = paste0("Y", seq_len(p))
 cost_fn = list(c1 = function(X, Y, y_need = 1) Y[,1],
                c2 = function(X, Y, y_need = 1:2) 3 * Y[,2] - Y[,1])
 
-res = optisure(X, Y, fn = cost_fn, alpha = 0.05, g = g_cstr, X_space_csrt=T,
+res = MOOVaR(X, Y, fn = cost_fn, alpha = 0.05, g = g_cstr, X_space_csrt=T,
                B = 10, parametric=TRUE)
 
 

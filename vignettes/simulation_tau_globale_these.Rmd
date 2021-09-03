@@ -85,7 +85,7 @@ res_all = lapply(rr, function(r){
 
   res_list = lapply(tau_list, function(tau){
     lapply(c(FF=FALSE, TT=TRUE), function(globale_tau){
-      optisure(X, Y, tau = rep(tau, NCOL(Y)),
+      MOOVaR(X, Y, tau = rep(tau, NCOL(Y)),
                globale_tau = rep(globale_tau, NCOL(Y)),
                X_space_csrt = FALSE,
                TT = 20, sens = rep("max", p))

@@ -78,7 +78,7 @@ ggsave("output/globale_risk2.png", width = 8, height = 4)
 tau_list = c(0.15, 0.3, 0.5)
 res_list = lapply(tau_list, function(tau){
   lapply(c(FALSE, TRUE), function(globale_tau){
-    optisure(X, Y, tau = rep(tau, NCOL(Y)),
+    MOOVaR(X, Y, tau = rep(tau, NCOL(Y)),
              globale_tau = rep(globale_tau, NCOL(Y)),
              X_space_csrt = FALSE,
              TT = 20, sens = rep("max", p))
