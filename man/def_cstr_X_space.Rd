@@ -12,7 +12,9 @@ a/several point(s) belong to the space where the points where observed
 }
 \details{
 @param X matrix of dimension n x d observed points
- @param m a vector of size d to indicate how many reference points create for each dimension.
+ @param alpha probability to deal with the trade-off false positive false
+ negatif. Alpha closed to 1 mean low false positive and vice versa
+ @param path_tracking path where to write the step of the running function.
 }
 \examples{
 library(tidyverse)

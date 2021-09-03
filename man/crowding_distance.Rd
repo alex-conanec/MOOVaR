@@ -10,7 +10,7 @@ crowding_distance(
 )
 }
 \arguments{
-\item{S}{a matrix/data.frame of evaluated points belonging to the same front}
+\item{Y}{a matrix/data.frame of evaluated points belonging to the same front}
 }
 \value{
 A vector containing the crowding distances

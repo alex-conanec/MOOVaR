@@ -1,3 +1,12 @@
+#' quant_reg_global_risk
+#'
+#' @param X data.frame of the dependent variables.
+#' @param Y data.frame of the response variables.
+#' @param tau vector of size NCOL(Y) containing the risk in ]0,1[ of each Y.
+#' @param floor threshold to prevent estimate hard quantile with not enought data
+#' @param max_iter integer to stop search if not converged. 20 by default.
+#' @param path_tracking path where to write the step of the running function.
+
 #' @export
 quant_reg_global_risk = function(X, Y, tau, floor = 5/NROW(X), max_iter = 20,
                                  path_tracking = NULL){

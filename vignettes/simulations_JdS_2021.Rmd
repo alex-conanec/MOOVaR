@@ -1,0 +1,123 @@
+---
+title: "simulations_JdS_2021"
+author: "Alexandre Conanec"
+date: "9/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simulations
+
+
+```{r simu_globale}
+library(tidyverse)
+library(MOOVaR)
+library(latex2exp)
+
+set.seed(123)
+n <- 300
+
+# X quanti ----
+# X
+d = 4
+X <- as.data.frame(matrix(runif(n = n*d, min = -2, max = 2), nrow = n, ncol = d))
+colnames(X) = paste0("X", seq_len(d))
+
+#calcul des Y selon une relation lineaire + du bruit
+p = 3
+beta = matrix(round(runif(n = p*d, min = -2, max = 2), 1), ncol = p, nrow = d)
+
+Y = as.matrix(X) %*% beta
+
+set.seed(12)
+epsilon1 = rnorm(n, sd = 0.5)
+epsilon2 = scale(-0.5*epsilon1 + rnorm(n, sd = 0.5))
+epsilon3 = scale(0.3*epsilon2 + rnorm(n, sd = 0.5))
+epsilon = matrix(c(epsilon1, epsilon2, epsilon3), ncol = p, nrow = n, byrow = F)
+
+# C = matrix(c(1, -0.48, -0.21, -0.48, 1, 0.44, -0.21, 0.44, 1), 3, 3)
+# epsilon = mvtnorm::rmvnorm(n=n, mean=rep(0, 3), sigma = C, method="chol")
+
+cor(epsilon)
+Y = Y + epsilon
+
+
+#plot
+combi = list(c(1, 2), c(1, 3), c(2, 3))
+tau = 0.3
+lapply(combi, function(k){
+  data = as.data.frame(epsilon[,k])
+  labels = paste0("e_", k)
+  colnames(data) = labels
+  data$phi = as.factor(ifelse( data[,1] > quantile(data[,1], tau) &
+                                 data[,2] > quantile(data[,2], tau),
+                               "phi", "1-phi"))
+
+  ggplot(data) + geom_point(aes_string(x = labels[1],
+                                       y = labels[2],
+                                       colour = "phi")) +
+    scale_colour_manual(values = c("orange", "green"),
+                        labels = unname(TeX(c("$1-\\Phi$", "$\\Phi$")))) +
+    geom_vline(xintercept = quantile(data[,1], tau)) +
+    geom_hline(yintercept = quantile(data[,2], tau)) +
+    xlab(TeX(paste0("$\\epsilon^{(", k[1], ")}$"))) +
+    ylab(TeX(paste0("$\\epsilon^{(", k[2], ")}$"))) +
+    theme_bw() +
+    theme(legend.title = element_blank(),
+          legend.text.align = 0.5)
+}) -> pp
+ggpubr::ggarrange(plotlist = pp, ncol = 3, common.legend = TRUE, legend = "right")
+ggsave("output/globale_risk2.png", width = 8, height = 4)
+
+
+
+
+tau_list = c(0.15, 0.3, 0.5)
+res_list = lapply(tau_list, function(tau){
+  lapply(c(FALSE, TRUE), function(globale_tau){
+    optisure(X, Y, tau = rep(tau, NCOL(Y)),
+             globale_tau = rep(globale_tau, NCOL(Y)),
+             X_space_csrt = FALSE,
+             TT = 20, sens = rep("max", p))
+  })
+})
+
+
+
+#tableau resultat latex
+lapply(seq_along(tau_list), function(i){
+  a = lapply(1:2, function(k){
+    mu = apply(res_list[[i]][[k]]$Y, 2, mean) %>% signif(2)
+    s = apply(res_list[[i]][[k]]$Y, 2, sd) %>% signif(2)
+    cbind(
+      `$\\tau$` = tau_list[i],
+      `Méthode` = c("Non ajusté", "Ajusté")[k],
+      `$\\Phi$` = res_list[[i]][[k]]$globale_confiance %>% round(2),
+      as.data.frame(paste0(mu, " $\\pm~$ ", s) %>% t() ),
+      as.data.frame(res_list[[i]][[k]]$tau_j %>%
+                      round(2) %>%
+                      as.character()%>% t() ))
+  }) %>% bind_rows()
+
+
+  # b = rbind(
+  #   cbind(`Méthode` = c("Non ajusté", "Ajusté"), a),
+  #   cbind(`Méthode` = "$\\tau + \\lambda^{(j)}$",
+  #         `$\\Phi$` = NA, as.data.frame(res_list[[i]][[2]]$tau_j %>%
+  #                                                   round(2) %>%
+  #                                                   as.character()%>% t() ))
+  # )
+
+  colnames(a)[4:6] = paste0("$y^{(", 1:3, ")}$")
+  colnames(a)[7:9] = paste0("\\tau + \\lambda^{(", 1:3,")}$")
+  # cbind(`$\\tau$` = tau_list[i], b)
+  a[,c(1:3, 4, 7, 5, 8, 6, 9)]
+
+}) %>% bind_rows() %>%
+  xtable::xtable(type = "latex") %>%
+  print(sanitize.text.function=identity, include.rownames=FALSE)
+
+```

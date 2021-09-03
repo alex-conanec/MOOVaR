@@ -7,9 +7,12 @@
 crossing_over_uniforme(parents, n_echange, param_mut)
 }
 \arguments{
-\item{couple}{a matrix/data.frame of two individus}
+\item{parents}{data.frame of individus}
 
-\item{crossing_position}{a sorted vector of variable position to switch}
+\item{n_echange}{integer between 1 and NCOL(X) indicating the number of
+exchanges done between both parents}
+
+\item{param_mut}{}
 }
 \value{
 a matrix/data.frame of the two childs from the crossing over of the

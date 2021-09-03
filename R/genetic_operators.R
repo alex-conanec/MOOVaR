@@ -3,8 +3,10 @@
 #' This function switch components for the given variables position between two
 #' individus (parent) which have been selected after the tounament
 #'
-#' @param couple a matrix/data.frame of two individus
-#' @param crossing_position a sorted vector of variable position to switch
+#' @param parents data.frame of individus
+#' @param n_echange integer between 1 and NCOL(X) indicating the number of
+#'  exchanges done between both parents
+#' @param param_mut
 #'
 #' @return a matrix/data.frame of the two childs from the crossing over of the
 #' parents

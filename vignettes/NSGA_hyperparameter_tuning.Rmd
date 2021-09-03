@@ -1,0 +1,78 @@
+---
+title: "NSGA huperparameter tuning"
+author: "Alexandre Conanec"
+date: "9/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r run_tuning eval=FALSE}
+library(MOOVaR)
+library(dplyr)
+library(tidyr)
+t = system.time({
+  res = tune_nsga(param_fixed = list(p = 2, n_lev = 2:4,
+                                     d1 = sample(9:12, 1),
+                                     d2 = sample(2:4, 1),
+                                     B = 2),
+                  param = list(
+                    k_tournament = 2:10,
+                    crossing_over_method = factor(c("uniforme", "bloc")),
+                    n_echange = 2:8,
+                    n_bloc = 2:5,
+                    mutation_method = factor(c("simple", "mixte")),
+                    freq_m = seq(0, 1, 0.1),
+                    TT = 10:60,
+                    N = 30:100
+                  ), N = 4, TT = 2, base_N_MC = 30, mc_cores = 4, seed=1234)
+})
+
+saveRDS(list(t = t, res = res),
+        file = "/gpfs/home/aconanec/Documents/simu_server/tune_nsga/res_tunage_nsga.RDS")
+
+```
+
+```{r visu}
+library(tidyverse)
+library(MOOVaR)
+
+res_simu = readRDS("../simu/res_tunage_nsga_p3.RDS")
+
+cat("Duree du calcul:", res_simu$t[3]%/%3600, "h", res_simu$t[3]%%3600 %/% 60, "min\n")
+
+
+qlt_plot = plot(res_simu$res, choice = "qlt", mc_cores = 2)
+# saveRDS(qlt_plot + ylab("HI") + theme_minimal(), "qlt_plot.RDS")
+readRDS("../simu/qlt_plot.RDS")
+ggsave(paste0(path, "tunage_qualite_approxi.png"))
+
+plot(res_simu$res, choice = "evol")
+PF_plot = plot(res_simu$res, choice = "PF")
+PF_plot
+
+
+plotly::orca(PF_plot, "../simu/PF_plot.svg", format = "svg",
+           width = 1200, height = 1000,
+           more_args = c('--disable-gpu'))
+
+# res_simu$res$res_nsga = res_nsga_run(res = res_simu$res, id = c(24, 19, 16), mc_cores = 2)
+# saveRDS(res_simu, "res_simu2.RDS")
+
+
+res_simu = readRDS("../res_simu2.RDS")
+
+# comp_plot = plot(res_simu$res, choice = "comp", id = c(24, 19, 16),
+#                  mc_cores = 2)
+
+# saveRDS(comp_plot, "../simu/comp_plot.RDS")
+
+
+readRDS("../simu/comp_plot.RDS")
+ggsave("../../Redaction/manuscript_these/figure_manuscript/trois_compromis_perf_tunage.png")
+
+
+```
