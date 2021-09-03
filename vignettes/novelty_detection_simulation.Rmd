@@ -1,0 +1,189 @@
+---
+title: "Novelty détection simulation"
+author: "Alexandre Conanec"
+date: "9/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simulation
+
+```{r data_simu}
+data_test = function(n, d, p = 4, min_n = floor(n/p/3), max_n = floor(n/p/2)){
+
+  X = matrix(runif(2*n*d, min = 0, max = 10), ncol = d, nrow = n)
+
+  spot = matrix(runif(2*n*d, min = 0, max = 10), ncol = d, nrow = p)
+  n_spot = sample(min_n:max_n, p, replace = TRUE)
+
+  A = array(spot, dim = c(dim(spot), n))
+  B = array(X, dim = c(dim(X), p))
+  B = apply(B, c(3, 2, 1), function(x) x)
+  index = apply((A-B)^2, c(1, 3), sum) %>%
+    apply(1, function(x) rank(x) < n_spot) %>%
+    apply(1, any)
+
+  list(X_true = X[index,], X_c = X[!index,])
+}
+```
+
+```{r model_fit}
+model_fit = function(X_train, X_threshold, method){
+
+  if (method == "density"){
+    H = ks::Hpi(x = X_train)
+    pred_threshold = ks::kde(x = X_train, H = H,
+                             eval.points = X_threshold)$estimate
+    list(method = method,
+         H = H,
+         X_train = X_train,
+         pred_threshold = pred_threshold)
+  }else if (method == "iForest"){
+    iforest <- isolationForest$new(sample_size = NROW(X_train),
+                                   num_trees = 1000)
+    vide = capture.output( iforest$fit(dataset = X_train) )
+    pred_threshold = iforest$predict(X_threshold)$anomaly_score
+    list(method = method,
+         iforest = iforest,
+         pred_threshold = pred_threshold)
+  }
+
+}
+```
+
+```{r pred_score}
+pred_score = function(model, X){
+
+  if (model$method == "density"){
+    ks::kde(x = model$X_train, H = model$H, eval.points = X)$estimate
+  }else if (model$method == "iForest"){
+    model$iforest$predict(X)$anomaly_score
+  }
+
+}
+```
+
+```{r pred_belong}
+pred_belong = function(model, X, alpha){
+
+  if (model$method == "density"){
+    threshold = quantile(model$pred_threshold, alpha)
+    X > threshold
+  }else if (model$method == "iForest"){
+    threshold = quantile(model$pred_threshold, 1-alpha)
+    X < threshold
+  }
+}
+```
+
+```{r simulation_all}
+library(solitude)
+library(tidyverse)
+library(latex2exp)
+
+path = "~/Seafile/PLMbox/These/Redaction/manuscript_these/figure_manuscript/"
+set.seed(123)
+N = 10000
+p = 8
+train_split = 0.8
+
+res = lapply(c(30, 100, 500), function(n){
+  lapply(c(2, 3, 4, 5, 6, 7), function(d){
+    data = data_test(n=N, d=d, p=p)
+
+    lapply(c("density", "iForest"), function(method){
+      # cat("method:", method, "d:", d, "n:", n, "\n")
+
+      X_true = as.data.frame(data$X_true)
+      train = sample(1:NROW(X_true), n)
+      train_density = sample(train, n*train_split)
+      X_train = X_true[train_density,]
+      X_threshold = X_true[-train_density,]
+      X_true_test = X_true[-train,]
+      X_c = as.data.frame(data$X_c)
+
+      model = model_fit(X_train = X_train, X_threshold = X_threshold,
+                        method = method)
+      pred_true = pred_score(model, X_true_test)
+      pred_false = pred_score(model, X_c)
+
+
+      #calcul pour plusieurs alpha
+      alphas = seq(10^(-3), 1, length.out = 20)
+      lapply(alphas, function(alpha){
+
+        data.frame(TPR = sum(pred_belong(model, pred_true, alpha)) /
+                     NROW(X_true_test),
+                   FPR = sum(pred_belong(model, pred_false, alpha)) /
+                     NROW(X_c),
+                   alpha = alpha, d = d, method = method, n = n)
+
+      }) %>% bind_rows()
+
+    }) %>% bind_rows()
+
+  }) %>% bind_rows()
+
+}) %>% bind_rows()
+
+res %>%
+  mutate(d = as.factor(as.character(d))) %>%
+  ggplot() +
+  geom_line(aes(x=FPR, y=TPR, colour = d)) +
+  geom_abline(slope = 1, intercept = 0) +
+  facet_grid(n ~ method) +
+  theme_bw()
+
+ggsave(filename = paste0(path, "simu1_constrainte.png"))
+```
+
+```{r simulation_2D}
+set.seed(1234)
+N = 10000
+n = 300
+d = 2
+data = data_test(n=N, d=d, p=p)
+alpha = 0.15
+
+df = lapply(c("density", "iForest"), function(method){
+
+  X_true = as.data.frame(data$X_true)
+  train = sample(1:NROW(X_true), n)
+  train_density = sample(train, n*train_split)
+  X_train = X_true[train_density,]
+  X_threshold = X_true[-train_density,]
+  X_true_test = X_true[-train,]
+  X_c = as.data.frame(data$X_c)
+
+  model = model_fit(X_train = X_train, X_threshold = X_threshold,
+                    method = method)
+  pred_true = pred_score(model, X_true_test)
+  pred_false = pred_score(model, X_c)
+
+  df = data.frame(
+    x1 = c(X_true_test[,1], X_c[,1]),
+    x2 = c(X_true_test[,2], X_c[,2]),
+    real = c(rep(TRUE, NROW(X_true_test)), rep(FALSE, NROW(X_c)) ),
+    predict = c(pred_belong(model, pred_true, alpha),
+                pred_belong(model, pred_false, alpha))
+  )
+
+  df$statut = as.factor(paste(as.character(df$real), as.character(df$predict), sep = "_"))
+  levels(df$statut) = c("TN", "FP", "FN", "TP")
+  print(table(df$statut))
+  df$method = method
+  df
+}) %>% bind_rows()
+
+ggplot(df) +
+  geom_point(aes(x=x1, y=x2, colour = statut)) +
+  xlab(TeX("$X_1$")) +
+  ylab(TeX("$X_2$")) +
+  facet_wrap(vars(method)) +
+  theme_bw()
+
+ggsave(filename = paste0(path, "simu2_constrainte.png"))
+```

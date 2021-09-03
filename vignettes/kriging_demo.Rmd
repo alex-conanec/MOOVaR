@@ -1,0 +1,115 @@
+---
+title: "Kriging demo"
+author: "Alexandre Conanec"
+date: "9/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simulation
+
+
+```{r kriging_fit}
+kriging_fit = function(X, y){
+
+  n = NROW(X)
+  A = matrix(X, ncol = n, nrow = n)
+
+  loss_theta = function(theta){
+    R = exp(-theta * (A - t(A))^2)
+    R_inv = solve(R)
+    beta = solve(t(X) %*% R_inv %*% X) %*% t(X) %*% R_inv %*% y
+    sigma_2 = 1/n * t((y - X %*% beta)) %*% R_inv %*% (y - X %*% beta)
+
+    -1/2 * ( n * log(sigma_2) + log(det(R)) )
+  }
+
+  theta = optimize(f = loss_theta, interval = c(0.01, 5), maximum = TRUE)$maximum
+
+  R = exp(-theta * (A - t(A))^2)
+  R_inv = solve(R)
+  beta = solve(t(X) %*% R_inv %*% X) %*% t(X) %*% R_inv %*% y
+  sigma_2 = 1/n * t((y - X %*% beta)) %*% R_inv %*% (y - X %*% beta)
+
+  list(beta = beta, R_inv = R_inv, sigma_2 = sigma_2, theta = theta, X = X, y = y)
+}
+```
+
+```{r kriging_predict}
+kriging_predict = function(x, model, inter_conf_quantile = qnorm(0.025)){
+
+  theta = model$theta
+  R_inv = model$R_inv
+  sigma_2 = model$sigma_2
+  beta = model$beta
+  X = model$X
+  y = model$y
+
+  r_x = exp(-theta*(X - x)^2)
+  gamma = y - X %*% beta
+  u = t(X) %*% R_inv %*% r_x - x
+
+  mu = t(x) %*% beta + t(r_x) %*% R_inv %*% gamma
+  phi = sigma_2 * (1 + t(u) %*% solve(t(X) %*% R_inv %*% X) %*% u - t(r_x) %*% R_inv %*% r_x )
+
+  data.frame(mu,
+             phi,
+             borne_inf = mu - inter_conf_quantile * phi,
+             borne_sup = mu + inter_conf_quantile * phi)
+
+}
+```
+
+```{r test}
+test = function(X, y, n_x = 1000){
+  x_range = seq(-5, 5, length.out = n_x)
+
+  model = kriging_fit(X, y)
+  cat("theta :", model$theta,
+      "\nsigma :", sqrt(model$sigma_2),
+      "\nbeta :", model$beta)
+  res = lapply(x_range, kriging_predict, model = model) %>% bind_rows()
+
+  df = data.frame(x = x_range, y_true = f(x_range), res)
+
+  ggplot(data = df) +
+    geom_line(aes(x=x, y=y_true), colour = "blue") +
+    geom_line(aes(x=x, y=mu), colour = "red") +
+    geom_ribbon(aes(x = x, ymin = borne_inf, ymax = borne_sup), alpha = .5, fill = "orange") +
+    geom_point(data = data.frame(x=X, y=y), aes(x=x, y=y)) +
+    ylab("") +
+    theme_bw()
+
+}
+```
+
+```{r simu}
+library(tidyverse)
+path = "~/Seafile/PLMbox/These/Redaction/manuscript_these/figure_manuscript/"
+set.seed(123)
+n = 10
+X = runif(n, -5, 5)
+f = function(x) sin(x)
+y = f(X) + rnorm(n,sd=0.1)
+
+test(X, y)
+ggsave(paste0(path, "kriging_t0.png"))
+
+#on rajoute une observation à x=2
+X = c(X, 2)
+y = c(y, f(2))
+
+test(X, y) + geom_point(data = data.frame(x=2, y=f(2)), aes(x,y), colour = "green")
+ggsave(paste0(path, "kriging_t1.png"))
+
+#on rajoute une observation à x=-3
+X = c(X, -3)
+y = c(y, f(-3))
+
+test(X, y) + geom_point(data = data.frame(x=-3, y=f(-3)), aes(x,y), colour = "green")
+ggsave(paste0(path, "kriging_t2.png"))
+
+```

@@ -7,7 +7,7 @@
 #' Compute the crowding distance between all the point belonging to a same
 #' front
 #'
-#' @param S a matrix/data.frame of evaluated points belonging to the same front
+#' @param Y a matrix/data.frame of evaluated points belonging to the same front
 #'
 #' @return A vector containing the crowding distances
 #'

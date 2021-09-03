@@ -1,10 +1,28 @@
 #' optisure
 #'
+#' @param X matrix or data.frame of n observation of the decision variable of size d.
+#' @param Y matrix or data.frame of n observation of the p objectifs.
+#' @param sens vector of size p containing either "max" (by default) or "min"
+#'  to choose how to optimize each objectif.
+#' @param quantile_utility_idx vector of size p containing boolean to choose the utility method.
+#' TRUE and therefore quantile method is used by default.
+#' @param g list of constraint given as function of X. NULL by default
+#' @param X_space_csrt boolean to choose either a constraint should be added to
+#'  check if each solution belongs to the decision space.
+#' @param tau vector of size p containing the risk in ]0,1[ of each objectif.
+#' @param globale_tau vector of size p boolean indicating either the objectif risk must ne manage with other.
+#' @param alpha probability to deal with the trade-off false positive false
+#'  negatif. Only if X_space_csrt=TRUE.
+#' @param N integer indicating the size of the population.
+#' @param TT integer indicating the number of population to grow.
+#' @param seed integer to set the seed and therefore obtain reproducible exemple.
+#' @param updateProgress function to follow the progression of the running function
+#' @param path_tracking path where to write the step of the running function.
+#'
 #' @examples
-#' # generate data ----
 #' library(tidyverse)
-#' library(optisure)
-#' set.seed(1234)
+#' library(MOOVaR)
+#' set.seed(12)
 #' n <- 300
 #'
 #' # X quanti ----
@@ -19,7 +37,7 @@
 #' X = X1
 #'
 #' #calcul des Y selon une relation lineaire + du bruit
-#' p = 2
+#' p = 4
 #' fn = lapply(seq_len(p), function(j){
 #'   beta = runif(n = d1, min = -2, max = 2)
 #'   function(X) {
@@ -32,46 +50,25 @@
 #'   f(X) + rnorm(n)
 #' }) %>% as.data.frame(row.names = seq_len(n))
 #'
-#' # Opti
-#' res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 #'
-#' plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
-#'      xlim = c(-8,8), ylim = c(-10,6))
-#' points(Y, col = "grey")
-#' points(res$Y, type = 'b', col = "blue", lwd = 3)
-#'
-#' #X quali----
-#' d2 = 2
-#' lev = sample(x = 2:4, d2, replace = TRUE)
-#' X2 <- sapply(seq_len(d2), function(k){
-#'   as.factor(sample(x = seq_len(lev[k]), size = n, replace = TRUE))
-#' }) %>% as.data.frame()
-#' colnames(X2) = paste0("X", (d1+1):(d1+d2))
-#'
-#' X = cbind(X1, X2)
-#' head(X)
-#'
-#' #calcul des Y selon une relation lineaire + du bruit
-#' fn = lapply(seq_len(p), function(j){
-#'   beta = runif(n = (d1 + sum(lev-1)), min = -2, max = 2)
-#'   function(X) {
-#'     is_num = sapply(X, is.numeric)
-#'     X1 = X[, is_num]
-#'     X2 = X[, !is_num]
-#'     X2 = model.matrix(~., data = X2)[,-1]
-#'     X = cbind(X1, X2)
-#'     as.matrix(X) %*% beta
+#' g_cstr = list(
+#'   function(x){
+#'     x = as.data.frame(x)
+#'     x[,1] + x[,2] + x[,3] < 2
 #'   }
-#' })
-#' names(fn) = paste0("Y", seq_len(p))
+#' )
 #'
-#' #opti
-#' res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 #'
-#' plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
-#'      xlim = c(-8,8), ylim = c(-10,6))
-#' points(Y, col = "grey")
-#' points(res$Y, type = 'b', col = "blue", lwd = 3)
+#' res = optisure(X, Y,
+#'                sens = rep("max", NCOL(Y)),
+#'                quantile_utility_idx = c(T,T,T,F),
+#'                tau = rep(0.2, p),
+#'                globale_tau = c(F, T, T, F),
+#'                g = g_cstr,
+#'                X_space_csrt=T, TT = 10)
+#'
+#'
+#' plot(res)
 #'
 #' @importFrom magrittr %>%
 #' @export
@@ -81,11 +78,9 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
                      tau = rep(0.5, NCOL(Y)),
                      globale_tau = rep(F, NCOL(Y)),
                      alpha = 0.15,
-                     # reg_method = "linear", #rajouté
                      N = NULL, TT = NULL, seed = NULL,
                      updateProgress = NULL,
-                     path_tracking = NULL,
-                     ...){
+                     path_tracking = NULL){
 
   # library(reticulate)
   d = NCOL(X)
@@ -244,13 +239,13 @@ optisure <- function(X, Y, sens = rep("max", NCOL(Y)),
   tracking_msg(path_tracking, msg = "End")
 
   #mise en forme des resultats ##### a modifier aussi
-  # if (globale_tau){
-  #   res$tau_j = qrgr$tau
-  #   res$globale_confiance = qrgr$globale_confiance
-  # }else{
-  #   res$globale_confiance = sum(apply(Y - m(X) > 0, 1, all))/n
-  #   res$tau_j = rep(tau, p)
-  # }
+  if (sum(globale_tau) >= 2){
+    res$tau_j = qrgr$tau
+    res$globale_confiance = qrgr$globale_confiance
+  }else{
+    res$globale_confiance = sum(apply(Y - m(X) > 0, 1, all))/n
+    res$tau_j = rep(tau, p)
+  }
 
 
   # Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))

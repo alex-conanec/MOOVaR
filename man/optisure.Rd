@@ -18,18 +18,49 @@ optisure(
   TT = NULL,
   seed = NULL,
   updateProgress = NULL,
-  path_tracking = NULL,
-  ...
+  path_tracking = NULL
 )
+}
+\arguments{
+\item{X}{matrix or data.frame of n observation of the decision variable of size d.}
+
+\item{Y}{matrix or data.frame of n observation of the p objectifs.}
+
+\item{sens}{vector of size p containing either "max" (by default) or "min"
+to choose how to optimize each objectif.}
+
+\item{quantile_utility_idx}{vector of size p containing boolean to choose the utility method.
+TRUE and therefore quantile method is used by default.}
+
+\item{g}{list of constraint given as function of X. NULL by default}
+
+\item{X_space_csrt}{boolean to choose either a constraint should be added to
+check if each solution belongs to the decision space.}
+
+\item{tau}{vector of size p containing the risk in ]0,1[ of each objectif.}
+
+\item{globale_tau}{vector of size p boolean indicating either the objectif risk must ne manage with other.}
+
+\item{alpha}{probability to deal with the trade-off false positive false
+negatif. Only if X_space_csrt=TRUE.}
+
+\item{N}{integer indicating the size of the population.}
+
+\item{TT}{integer indicating the number of population to grow.}
+
+\item{seed}{integer to set the seed and therefore obtain reproducible exemple.}
+
+\item{updateProgress}{function to follow the progression of the running function}
+
+\item{path_tracking}{path where to write the step of the running function.}
 }
 \description{
 optisure
 }
 \examples{
-# generate data ----
 library(tidyverse)
-library(optisure)
-set.seed(1234)
+library(MOOVaR)
+set.seed(12)
 n <- 300
 
 # X quanti ----
@@ -44,7 +75,7 @@ colnames(X1) = paste0("X", seq_len(d1))
 X = X1
 
 #calcul des Y selon une relation lineaire + du bruit
-p = 2
+p = 4
 fn = lapply(seq_len(p), function(j){
   beta = runif(n = d1, min = -2, max = 2)
   function(X) {
@@ -57,45 +88,24 @@ Y = lapply(fn, function(f){
   f(X) + rnorm(n)
 }) \%>\% as.data.frame(row.names = seq_len(n))
 
-# Opti
-res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 
-plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
-     xlim = c(-8,8), ylim = c(-10,6))
-points(Y, col = "grey")
-points(res$Y, type = 'b', col = "blue", lwd = 3)
-
-#X quali----
-d2 = 2
-lev = sample(x = 2:4, d2, replace = TRUE)
-X2 <- sapply(seq_len(d2), function(k){
-  as.factor(sample(x = seq_len(lev[k]), size = n, replace = TRUE))
-}) \%>\% as.data.frame()
-colnames(X2) = paste0("X", (d1+1):(d1+d2))
-
-X = cbind(X1, X2)
-head(X)
-
-#calcul des Y selon une relation lineaire + du bruit
-fn = lapply(seq_len(p), function(j){
-  beta = runif(n = (d1 + sum(lev-1)), min = -2, max = 2)
-  function(X) {
-    is_num = sapply(X, is.numeric)
-    X1 = X[, is_num]
-    X2 = X[, !is_num]
-    X2 = model.matrix(~., data = X2)[,-1]
-    X = cbind(X1, X2)
-    as.matrix(X) \%*\% beta
+g_cstr = list(
+  function(x){
+    x = as.data.frame(x)
+    x[,1] + x[,2] + x[,3] < 2
   }
-})
-names(fn) = paste0("Y", seq_len(p))
+)
 
-#opti
-res = optisure(X, Y, N=20, TT=10, alpha = 0.5)
 
-plot(ellipse_var(Y$Y1, Y$Y2, alpha = 0.05), type = 'l', xlab = "Y1", ylab = "Y2",
-     xlim = c(-8,8), ylim = c(-10,6))
-points(Y, col = "grey")
-points(res$Y, type = 'b', col = "blue", lwd = 3)
+res = optisure(X, Y,
+               sens = rep("max", NCOL(Y)),
+               quantile_utility_idx = c(T,T,T,F),
+               tau = rep(0.2, p),
+               globale_tau = c(F, T, T, F),
+               g = g_cstr,
+               X_space_csrt=T, TT = 10)
+
+
+plot(res)
 
 }

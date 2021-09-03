@@ -9,7 +9,8 @@ dominance_ranking(X, sens)
 \arguments{
 \item{X}{a matrix/data.frame of all the selected individus evaluation}
 
-\item{sens}{the objectif fonctions goal which can be either "min" or "max"}
+\item{sens}{vector of size NCOL(X) containing either "min" or "max"
+to choose how to optimize each objectif.}
 }
 \value{
 a vecteur of rank associated with the individus of X

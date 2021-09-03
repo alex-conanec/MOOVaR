@@ -28,19 +28,54 @@ NSGA(
 )
 }
 \arguments{
-\item{X}{a matrix/data.frame of an initial population}
+\item{X}{matrix or data.frame of the initial population}
 
-\item{N}{the size of the population P before the generation of individus.
-By default N=NROW(X)/2}
+\item{fn}{multivarious functions taking X as argument and return p objectifs for each individu (row) of X}
 
-\item{ff}{a list of list containing the function or predicting model and
-if the objectif function should be maximise "max" or minimize "min"}
+\item{n_objective}{number of objective}
 
-\item{crossing_over_size}{number of variable to switch when doing the
-crossing over}
+\item{sens}{vector of size n_objective containing either "min" (by default) or "max"
+to choose how to optimize each objectif.}
 
-\item{freq_mutation}{a vector of numerics value varying from 0 to 1 which
-represent the frequency of mutation of each variable}
+\item{N}{integer indicating the size of the population}
+
+\item{g}{list of constraint given as function of X. NULL by default}
+
+\item{k_tournament}{integer between 2 and N indicating the number of individu
+to pick at each tournament}
+
+\item{n_echange}{integer between 1 and NCOL(X) indicating the number of
+exchanges done between both parents}
+
+\item{n_bloc}{integer between 1 and NCOL(X) indicating the number of bloc
+switch between both parents}
+
+\item{crossing_over_method}{crossingover method to use in c("uniforme", "bloc")}
+
+\item{mutation_method}{mutation method to use in c("simple", "mixte")}
+
+\item{freq_m}{mutation frequence for categorial variable or all variable
+when mutation_method="simple"}
+
+\item{type_var}{type of the X variables. NULL by default}
+
+\item{distri_Xi}{list containing NCOL(X) inner list where four parameter are
+given for a numeric variable: min, max, mean, sd and one if it is
+categorical variable : levels}
+
+\item{seed}{integer to set the seed and therefore obtain reproducible exemple.}
+
+\item{TT}{integer indicating the number of population to grow}
+
+\item{verbose}{if TRUE, echo information about the time generating the last
+population}
+
+\item{front_tracking}{if TRUE, the objectif achievement of each population
+is stored in the result}
+
+\item{updateProgress}{function to follow the progression of the running function}
+
+\item{path_tracking}{path where to write the step of the running function.}
 }
 \value{
 a vecteur of rank associated with the individus of X

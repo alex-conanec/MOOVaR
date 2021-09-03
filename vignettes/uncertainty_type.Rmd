@@ -1,0 +1,45 @@
+---
+title: "Uncertainty type"
+author: "Alexandre Conanec"
+date: "9/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+
+path = "~/Seafile/PLMbox/These/Redaction/manuscript_these/figure_manuscript/"
+
+x = seq(-3, 3, 0.1)
+n = length(x)
+e = rnorm(n)
+f = function(x) x^2
+
+df = data.frame(
+  x = x,
+  x2 = f(x),
+  f_bruit = f(x) + e,
+  x_bruit = f(x + e)
+) %>% gather(key = f, value = y, -x) %>%
+  mutate(f = factor(f, levels = c("x2", "f_bruit", "x_bruit")))
+
+library(latex2exp)
+ggplot(df, aes(x = x, y = y)) +
+  geom_line(aes(group = f, colour = f)) +
+  scale_colour_manual(values = c("blue", "orange", "red"),
+                      labels = unname(TeX(c("$f(x)$", "$f(x) + \\epsilon$",
+                                            "$f(x + \\epsilon)$")))) +
+  ggtitle(TeX("$f(x)=x^2$")) +
+  theme_bw() +
+  theme(legend.text.align = 0,
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank())
+
+ggsave(paste0(path, "uncertainty_type.png"))
+```
+

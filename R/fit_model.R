@@ -1,3 +1,13 @@
+#' fit_model
+#'
+#' @param X matrix or data.frame of n observation of the decision variable of size d.
+#' @param Y matrix or data.frame of n observation of the p objectifs.
+#' @param reg_method only "linear" available yet.
+#' @param tau vector of size NCOL(Y) containing the risk in ]0,1[ of each objectif.
+#' @param method either "quantile" or "expected"
+#' @param penalty NULL by default
+
+#' @param path_tracking path where to write the step of the running function.
 
 #' @export
 fit_model = function(X, Y, reg_method = "linear", tau = NULL,
