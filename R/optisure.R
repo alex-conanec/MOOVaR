@@ -19,6 +19,25 @@
 #' @param updateProgress function to follow the progression of the running function
 #' @param path_tracking path where to write the step of the running function.
 #'
+#' @param X matrix or data.frame of n observation of the decision variable of size d.
+#' @param Y matrix or data.frame of n observation of the p objectifs.
+#' @param sens vector of size p containing either "max" (by default) or "min"
+#'  to choose how to optimize each objectif.
+#' @param quantile_utility_idx vector of size p containing boolean to choose the utility method.
+#' TRUE and therefore quantile method is used by default.
+#' @param g list of constraint given as function of X. NULL by default
+#' @param X_space_csrt boolean to choose either a constraint should be added to
+#'  check if each solution belongs to the decision space.
+#' @param tau vector of size p containing the risk in ]0,1[ of each objectif.
+#' @param globale_tau vector of size p boolean indicating either the objectif risk must ne manage with other.
+#' @param alpha probability to deal with the trade-off false positive false
+#'  negatif. Only if X_space_csrt=TRUE.
+#' @param N integer indicating the size of the population.
+#' @param TT integer indicating the number of population to grow.
+#' @param seed integer to set the seed and therefore obtain reproducible exemple.
+#' @param updateProgress function to follow the progression of the running function
+#' @param path_tracking path where to write the step of the running function.
+#'
 #' @examples
 #' library(tidyverse)
 #' library(MOOVaR)

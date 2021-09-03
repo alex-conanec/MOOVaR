@@ -1,0 +1,119 @@
+---
+title: "Estimation quantiles conditionelles"
+author: "Alexandre Conanec"
+date: "11/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Lors des dernières simulations, il a été observé que le comportement du front de 
+pareto était étrange comparé au résultat attendu. Les "sauts" du front sont imputés
+à l'estimation non paramétrique du front. Pour lutter contre ce phénomène, nous
+avions décider de repartir sur une estimation paramétrique des quantiles conditonelle.
+
+Pour ce faire, je génère des données en dimension 1 :
+$$ Y = X^2 + \epsilon, ~\text{avec}~ X\sim \mathcal{U}(-2, 2) 
+~\text{et}~ \epsilon \sim \mathcal{N}(0, \sigma(X))$$
+où
+$$ \sigma(X) =  0.3 + X^2$$
+Je vais comparer l'approche paramétrique et non paramétrique de l'estimation de q_\alpha(y|x) et q_{1-\alpha}(y|x) avec alpha = 5\% et x généré de -2 à 2 avec un pas de 0.1. 
+
+```{r data}
+n = 100
+X = data.frame(X1 = runif(n, -2, 2))
+sd_X = function(X){
+  0.3 + X[,1]^2/4
+}
+Y = 0.8*X[,1] + rnorm(n, mean = 0, sd = sd_X(X))
+alpha = 0.05
+x = seq(-2, 2, .1)
+```
+
+## Estimation non paramétrique
+
+Les formules d'avant
+
+```{r estimation non parametrique de q}
+library(optisure)
+h_n = hopt(X, Y)$h
+q_np = data.frame(lwr = conditionnal_quantile(X, Y, x, alpha, h_n)$y,
+                  up = conditionnal_quantile(X, Y, x, 1-alpha, h_n)$y)
+```
+
+## Estimation paramétrique
+
+### Estimation paramétrique de $\mathbb{E}[y|x]$
+
+$\mathbb{E}[y|x] = \beta'(1, x), ~\text{avec}~ \beta = (X'X)^{-1}X'Y$
+
+```{r estimation parametrique de mu}
+X = as.matrix(cbind(1, X))
+beta = solve(t(X) %*% X) %*% t(X) %*% Y
+```
+
+### Estimation non paramétrique de $VAR[y|x]^{1/2}$
+
+Pour estimer la variance, je n'ai pas trouvé d'autre alternative que d'utiliser une
+première estimation non paramétrique qui sera ensuite modélisé paramétriquement par un modèle polynomiale.
+
+$$VAR[y|x]^{1/2} = \sum\limits_{i=1}^n w_i(Y_i-\beta'(1,X_i))^2 \Bigg/ \sum\limits_{i=1}^n w_i $$
+
+où
+
+$$ 
+w_i = pi^(-1/2)\exp{-(\frac{X_i-x}{h})^2/2}
+$$
+et h fixer arbitrairement à 0.5
+
+```{r estimation non parametrique de sigma}
+K = function(x){
+  pi^(-1/2)*exp(-sum((x)^2)/2)
+}
+
+sd_nx = function(x, h=0.5){
+  w = rep(1, n)
+  w = apply(X[,-1, drop=FALSE], 1, function(Xi) K((Xi-x)/h) )
+  sqrt(sum(w * (Y - rep(t(beta) %*% c(1, x), n))^2)/sum(w) )
+}
+```
+
+### Estimation paramétrique de $VAR[y|x]^{1/2}$
+
+Posons
+$$B = VAR[y|{\bf x}]^{1/2}, {\bf x} = (-2+0.1k) ~\forall k \in \{0, 40\}$$
+et
+$$A = ({\bf x}^p), ~\forall~ p \in \{0, 5\}$$
+$$
+\theta = (A'A)^{-1}AB
+$$
+
+```{r estimation parametrique de sigma}
+A = sapply(0:5, function(p) x^p) 
+B = sapply(x, sd_nx)
+theta = solve(t(A)%*%A)%*%t(A)%*%B
+
+mu = t(beta) %*% t(A[,1:2])
+s = t(theta) %*% t(A)
+q_p = data.frame(lwr = mu[1,] + qnorm(alpha/2) * s[1,], 
+                 up = mu[1,] + qnorm(1 - alpha/2) * s[1,])
+```
+
+## Visualisation résultat
+
+```{r visu}
+plot(X[,2], Y)
+
+#estimation non paramétrique
+points(x, q_np$lwr, col = "green", type = "l")
+points(x, q_np$up, col = "green", type = "l")
+
+#estimation paramétrique
+points(x, q_p$lwr, col = "orange", type = "l")
+points(x, q_p$up, col = "orange", type = "l")
+```
+
