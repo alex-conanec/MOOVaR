@@ -65,14 +65,14 @@
 #' @export
 
 NSGA <- function(X, fn, n_objective, sens = rep("min", n_objective),
-                 N = NROW(X), g = NULL,
-                 k_tournament, n_echange=1, n_bloc = 2,
+                 N = round(NROW(X)/2), g = NULL,
+                 k_tournament = 10, n_echange=2, n_bloc = 2,
                  crossing_over_method = "uniforme",
                  mutation_method = "simple",
-                 freq_m=0.2,
+                 freq_m=0.3,
                  type_var = NULL,
                  distri_Xi = NULL,
-                 seed = NULL, TT=50, verbose = TRUE, front_tracking = TRUE,
+                 seed = NULL, TT=20, verbose = TRUE, front_tracking = TRUE,
                  updateProgress = NULL,
                  path_tracking = NULL){
 

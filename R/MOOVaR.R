@@ -13,9 +13,6 @@
 #' @param globale_tau vector of size p boolean indicating either the objectif risk must ne manage with other.
 #' @param alpha probability to deal with the trade-off false positive false
 #'  negatif. Only if X_space_csrt=TRUE.
-#' @param N integer indicating the size of the population.
-#' @param TT integer indicating the number of population to grow.
-#' @param seed integer to set the seed and therefore obtain reproducible exemple.
 #' @param updateProgress function to follow the progression of the running function
 #' @param path_tracking path where to write the step of the running function.
 #'
@@ -74,14 +71,15 @@
 #' @importFrom magrittr %>%
 #' @export
 MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
-                     quantile_utility_idx = rep(TRUE, NCOL(Y)),
-                     g = NULL, X_space_csrt = TRUE,
-                     tau = rep(0.5, NCOL(Y)),
-                     globale_tau = rep(F, NCOL(Y)),
-                     alpha = 0.15,
-                     N = NULL, TT = NULL, seed = NULL,
-                     updateProgress = NULL,
-                     path_tracking = NULL){
+                   quantile_utility_idx = rep(TRUE, NCOL(Y)),
+                   g = NULL, X_space_csrt = TRUE,
+                   tau = rep(0.5, NCOL(Y)),
+                   globale_tau = rep(F, NCOL(Y)),
+                   alpha = 0.15,
+                   updateProgress = NULL,
+                   path_tracking = NULL,
+                   mutation_method = "simple",
+                   ...){
 
   # library(reticulate)
   d = NCOL(X)
@@ -180,8 +178,8 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
 
 
   #tunage nsga parametres
-  if (is.null(TT)) TT = 20
-  if (is.null(N)) N = round(NROW(X)/2)
+  # if (is.null(TT)) TT = 20
+  # if (is.null(N)) N = round(NROW(X)/2)
 
   if (X_space_csrt){
     #tracking
@@ -196,42 +194,23 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
     g$cstr_X_space = X_space_csrt$g
   }
 
+
   if (any(sapply(X, is.numeric))){
     mutation_method = "mixte"
   }else{
     mutation_method = "simple"
   }
 
-  #appelle de NSGA
   res = NSGA(
     X = X,
     fn = m,
     n_objective = p,
     sens = rep("max", p),
     g = g,
-
-    #k tournois
-    k_tournament = 10,
-
-    #crossing over
-    crossing_over_method = "uniforme",
-    n_echange = 2,
-    n_bloc = 2,
-
-    #mutation
     mutation_method = mutation_method,
-    freq_m = 0.3,
-
-    #budget
-    N = N,
-    TT = TT,
-
-    #verbose
-    verbose = TRUE,
-    front_tracking = TRUE,
-    seed = seed,
     updateProgress = updateProgress,
-    path_tracking = path_tracking
+    path_tracking = path_tracking,
+    ...
   )
 
   if (is.function(updateProgress)) {

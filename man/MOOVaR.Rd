@@ -14,11 +14,10 @@ MOOVaR(
   tau = rep(0.5, NCOL(Y)),
   globale_tau = rep(F, NCOL(Y)),
   alpha = 0.15,
-  N = NULL,
-  TT = NULL,
-  seed = NULL,
   updateProgress = NULL,
-  path_tracking = NULL
+  path_tracking = NULL,
+  mutation_method = "simple",
+  ...
 )
 }
 \arguments{
@@ -43,12 +42,6 @@ check if each solution belongs to the decision space.}
 
 \item{alpha}{probability to deal with the trade-off false positive false
 negatif. Only if X_space_csrt=TRUE.}
-
-\item{N}{integer indicating the size of the population.}
-
-\item{TT}{integer indicating the number of population to grow.}
-
-\item{seed}{integer to set the seed and therefore obtain reproducible exemple.}
 
 \item{updateProgress}{function to follow the progression of the running function}
 
