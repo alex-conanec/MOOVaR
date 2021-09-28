@@ -15,10 +15,10 @@ library(MOOVaR)
 library(dplyr)
 library(tidyr)
 t = system.time({
-  res = tune_nsga(param_fixed = list(p = 2, n_lev = 2:4,
-                                     d1 = sample(9:12, 1),
-                                     d2 = sample(2:4, 1),
-                                     B = 2),
+  res = tune_nsga(param_fixed = list(p = 3, n_lev = c(rep(2,3), 5),
+                                     d1 = 13,
+                                     d2 = 4,
+                                     B = 15),
                   param = list(
                     k_tournament = 2:10,
                     crossing_over_method = factor(c("uniforme", "bloc")),
@@ -28,11 +28,11 @@ t = system.time({
                     freq_m = seq(0, 1, 0.1),
                     TT = 10:60,
                     N = 30:100
-                  ), N = 4, TT = 2, base_N_MC = 30, mc_cores = 4, seed=1234)
+                  ), N = 40, TT = 20, base_N_MC = 30, mc_cores = 15, seed=1234)
 })
 
-saveRDS(list(t = t, res = res),
-        file = "/gpfs/home/aconanec/Documents/simu_server/tune_nsga/res_tunage_nsga.RDS")
+res_simu = list(t = t, res = res)
+saveRDS(res_simu, file = "res_tunage_nsga.RDS")
 
 ```
 
@@ -40,39 +40,63 @@ saveRDS(list(t = t, res = res),
 library(tidyverse)
 library(MOOVaR)
 
-res_simu = readRDS("../simu/res_tunage_nsga_p3.RDS")
+res_simu = readRDS("res_tunage_nsga.RDS")
 
 cat("Duree du calcul:", res_simu$t[3]%/%3600, "h", res_simu$t[3]%%3600 %/% 60, "min\n")
 
 
 qlt_plot = plot(res_simu$res, choice = "qlt", mc_cores = 2)
-# saveRDS(qlt_plot + ylab("HI") + theme_minimal(), "qlt_plot.RDS")
-readRDS("../simu/qlt_plot.RDS")
-ggsave(paste0(path, "tunage_qualite_approxi.png"))
+qlt_plot + ylab("HI") + theme_minimal()
 
 plot(res_simu$res, choice = "evol")
-PF_plot = plot(res_simu$res, choice = "PF")
-PF_plot
+
+PF_plot = plot(res_simu$res, choice = "PF", as_list_plot = TRUE)
+
+library(plotly)
+s_y = subplot(PF_plot$p_y,
+              titleY = TRUE, titleX = TRUE, nrows = 1,
+              margin = c(0.1, 0.1, 0.1, 0.1),
+              widths = c(0.3, 0.4, 0.3))
+
+s_x = subplot(PF_plot$p_x, titleX = TRUE,
+              nrows = 2,
+              margin = c(0.02, 0.1, 0.02, 0.3/2))
 
 
-plotly::orca(PF_plot, "../simu/PF_plot.svg", format = "svg",
-           width = 1200, height = 1000,
-           more_args = c('--disable-gpu'))
+ggplotly(subplot(s_y, s_x, nrows = 2,
+                            margin = c(0.05, 0.05, 0.05,
+                                       0.4/2),
+                            titleY = TRUE, titleX = TRUE,
+                            heights = c(0.5, 0.5)
+)) %>%
+  highlight(on = "plotly_selected", off = "plotly_deselect",
+            color = "red", persistent = FALSE) %>%
+  config(
+    toImageButtonOptions = list(
+      format = "svg",
+      filename = "myplot",
+      width = 600,
+      height = 700
+    )
+  )
 
-# res_simu$res$res_nsga = res_nsga_run(res = res_simu$res, id = c(24, 19, 16), mc_cores = 2)
-# saveRDS(res_simu, "res_simu2.RDS")
+X = res_simu$res$X
+Y = res_simu$res$Y
 
+table(X$freq_m)
+table(X$crossing_over_method)
 
-res_simu = readRDS("../res_simu2.RDS")
+reg1bis=lm(Y$accuracy~., data=X)
+summary(reg1bis)
 
-# comp_plot = plot(res_simu$res, choice = "comp", id = c(24, 19, 16),
-#                  mc_cores = 2)
+ggplot(data.frame(X, Y)) +
+  geom_point(aes(x = t, y=N_eval, colour = mutation_method))+
+  xlab("temps (en sec)") +
+  ylab("N évaluations") +
+  guides(colour = guide_legend(title = "Méthode mut.")) +
+  theme_bw()
 
-# saveRDS(comp_plot, "../simu/comp_plot.RDS")
-
-
-readRDS("../simu/comp_plot.RDS")
-ggsave("../../Redaction/manuscript_these/figure_manuscript/trois_compromis_perf_tunage.png")
-
-
+res_simu$res$res_nsga = res_nsga_run(res = res_simu$res, id = c(19, 22, 23), mc_cores = 2)
+comp_plot = plot(res=res_simu$res, choice = "comp", id = c(19, 22, 23), mc_cores = 2)
+comp_plot + theme_bw() + xlab("T")
 ```
