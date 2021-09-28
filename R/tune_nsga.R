@@ -114,22 +114,23 @@ tune_nsga = function(param,
 
   set.seed(seed)
 
-  if (param_fixed$d2 > 2){
-    param_fixed$lev = sample(param_fixed$n_lev, param_fixed$d2, replace = TRUE)
-  }else{
-    param_fixed$lev = c(2, 5)
-  }
+  # param_fixed$lev = sample(param_fixed$n_lev, param_fixed$d2, replace = TRUE)
+  # if (param_fixed$d2 > 2){
+  #   param_fixed$lev = sample(param_fixed$n_lev, param_fixed$d2, replace = TRUE)
+  # }else{
+  #   param_fixed$lev = c(2, 5)
+  # }
 
 
   param_fixed$quali_design = purrr::cross(
-    lapply(param_fixed$lev, seq, from = 1)) %>%
+    lapply(param_fixed$n_lev, seq, from = 1)) %>%
     lapply(function(x){
       df = as.data.frame(x)
       colnames(df) = paste0("X", 1:NCOL(df))
       df
     }) %>% bind_rows() %>% mutate_if(is.integer, as.factor)
 
-  beta = matrix(runif(n = param_fixed$p*(param_fixed$d1 + sum(param_fixed$lev)),
+  beta = matrix(runif(n = param_fixed$p*(param_fixed$d1 + sum(param_fixed$n_lev)),
                       -1, 1), ncol = param_fixed$p)
 
 
@@ -299,12 +300,13 @@ tune_nsga = function(param,
 
 
 #' @export
-plot.tune_nsga = function(res, choice = "PF", id = NULL, mc_cores = 1){
+plot.tune_nsga = function(res, choice = "PF", id = NULL, mc_cores = 1,
+                          as_list_plot = FALSE){
 
   if (choice == "PF"){
     tmp = res
     class(tmp) = "nsga"
-    plot(tmp, choice = "PF")
+    plot(tmp, choice = "PF", as_list_plot = as_list_plot)
   }else if (choice == "evol"){
     tmp = res
     res=tmp
