@@ -66,7 +66,9 @@
 
 
 
-def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd n d'une combi < a p+1, non ?
+def_cstr_X_space <- function(X, alpha = 0.15,
+                             allowed_dependence = matrix(TRUE, nrow = NCOL(X), ncol = 1),
+                             path_tracking = NULL){ #/!\ pb qd n d'une combi < a p+1, non ?
 
   X = as.data.frame(X)
   is_fac = !sapply(data.frame(X), is.numeric)
@@ -115,6 +117,26 @@ def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd 
 
   if (all(is_fac)){
     res = unique(X)
+    dep = apply(allowed_dependence, 1, any)
+    row_to_del = NULL
+    col_to_del = NULL
+    for (i in 1:NCOL(res)){
+      is_na = is.na(res[,i])
+      if (dep[i] & any(is_na)){
+        row_to_del = unique(c(row_to_del, which(is_na)))
+      }else if (!dep[i]){
+        col_to_del = c(col_to_del, i)
+      }
+    }
+
+    if (!is.null(col_to_del)){
+      res = res[,-col_to_del]
+    }
+    if (!is.null(row_to_del)){
+      res = res[-row_to_del,]
+    }
+    res = lapply(res, as.factor) %>% data.frame()
+
   }else if (any(is_fac)){
     combinaison = data.frame(X) %>% dplyr::group_by_if(is.factor) %>%
       dplyr::summarise(n = n()) %>% filter(n > (sum(!is_fac) + 1)) %>% select(-n) #comment il gere ceux qui ont moins de (sum(!is_fac) + 1) ind ?
@@ -138,7 +160,6 @@ def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd 
   }
 
   g = function(x, res, d, path_tracking){
-
     if (NCOL(x) < d){
       x = matrix(x, ncol = d)
     }
@@ -199,24 +220,30 @@ def_cstr_X_space <- function(X, alpha = 0.15, path_tracking = NULL){ #/!\ pb qd 
       }
 
     }else{ #que des quali
-      combinaison = unique(x)
-      id = seq_len(n)
-      lapply(seq_len(NROW(combinaison)), function(k){
 
-        is_it_stopped(path_tracking)
+      check_combi = function(X_test, X_ref){
+        XX = array(as.matrix(X_ref), dim = c(dim(X_ref), NROW(X_test)))
+        YY = array(as.matrix(X_test), dim = c(dim(X_test), NROW(X_ref))) %>%
+          apply(c(3, 2, 1), function(x) x)
+        apply(XX - YY == 0, c(1,3), all) %>% apply(2, any)
+      }
 
-        mask = sapply(seq_len(n), function(i) all(x[i, , drop = FALSE] == combinaison[k, ,drop = FALSE]))
-        res_idx_k = sapply(seq_len(NROW(res)), function(i){
-          if (all(res[i, , drop = FALSE] == combinaison[k, , drop = FALSE])){
-            i
-          }else{
-            NULL
-          }
-        }) %>% unlist()
+      lev_fac = lapply(res, function(yy){
+        data.frame(lev = levels(yy), num = 1:nlevels(yy))
+      })
 
-        data.frame(id = id[mask], feasible = !is.null(res_idx_k))
+      xx = lapply(1:NCOL(res), function(i=1){
+        df = data.frame(lev = x[,i,T]) %>% left_join(lev_fac[[i]], by = "lev") %>%
+          select(num)
+        is_na = is.na(res)
+        if (any(is_na)) df[is_na] = 0.5
+        df
+      }) %>% as.data.frame()
+      colnames(xx) = colnames(res)
 
-      }) %>% bind_rows() %>% arrange(id) %>% pull(feasible)
+      yy = lapply(res, as.numeric) %>% as.data.frame()
+
+      check_combi(X_test = xx, X_ref = yy)
 
     }
 
