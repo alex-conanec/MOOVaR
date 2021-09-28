@@ -69,24 +69,29 @@
 #' plot(res)
 #'
 #' @importFrom magrittr %>%
+#' @importFrom dplyr select
 #' @export
 MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
                    quantile_utility_idx = rep(TRUE, NCOL(Y)),
-                   g = NULL, X_space_csrt = TRUE,
+                   optim_method = c("real_ind", "nsga", "none"),
+                   g = NULL, X_space_csrt = FALSE,
                    tau = rep(0.5, NCOL(Y)),
                    globale_tau = rep(F, NCOL(Y)),
                    alpha = 0.15,
                    updateProgress = NULL,
                    path_tracking = NULL,
                    mutation_method = "simple",
+                   allowed_dependence = matrix(TRUE, nrow = NCOL(X), ncol = NCOL(Y)),
+                   seed_R2 = NULL,
                    ...){
 
   # library(reticulate)
-  d = NCOL(X)
+  d = NCOL(X)-1
   p = NCOL(Y)
   n = NROW(X)
   col_names_Y = colnames(Y)
-  for (i in which(!sapply(X, is.numeric))) X[,i] = as.factor(X[,i,drop=TRUE])
+  is_fac = !sapply(X, is.numeric)
+  for (i in which(is_fac)) X[,i] = as.factor(X[,i,drop=TRUE])
 
   #sens optimisation
   Y = as.data.frame(Y)
@@ -105,13 +110,15 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
       if (length(glob_tau) > 1){
         stop("tau must be the same for objectif treating in globale risk")
       }
-      qrgr = quant_reg_global_risk(X = X, Y[,quantile_utility_idx, drop = FALSE],
+      qrgr = quant_reg_global_risk(X = X, Y=Y[,quantile_utility_idx, drop = FALSE],
+                                   allowed_dependence = allowed_dependence[,quantile_utility_idx, drop = FALSE],
                                    tau = glob_tau, path_tracking = path_tracking)
       m_quantile = qrgr$m
     }else if (!any(quantile_utility_idx[globale_tau]) |
               sum(quantile_utility_idx[globale_tau]) == 1){#individual risk management only
       m_quantile = fit_model(X, Y = Y[,quantile_utility_idx, drop = FALSE],
                              tau = tau[quantile_utility_idx],
+                             allowed_dependence = allowed_dependence[,quantile_utility_idx, drop = FALSE],
                              method = "quantile", path_tracking = path_tracking)
     }else{#gobal AND individual risk management
       #global risk
@@ -121,6 +128,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
         stop("tau must be the same for objectif treating in globale risk")
       }
       qrgr = quant_reg_global_risk(X = X, Y = Y[,global_risk_idx, drop = FALSE],
+                                   allowed_dependence = allowed_dependence[,global_risk_idx, drop = FALSE],
                                    tau = glob_tau, path_tracking = path_tracking)
       m_quantile_glob = qrgr$m
 
@@ -128,6 +136,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
       ind_risk_idx = quantile_utility_idx & !globale_tau
       m_quantile_ind = fit_model(X, Y = Y[,ind_risk_idx, drop = FALSE],
                                  tau = tau[ind_risk_idx],
+                                 allowed_dependence = allowed_dependence[,ind_risk_idx, drop = FALSE],
                                  method = "quantile",
                                  path_tracking = path_tracking)
     }
@@ -135,108 +144,148 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
 
   if (any(!quantile_utility_idx)){
     m_expect = fit_model(X, Y = Y[,!quantile_utility_idx, drop = FALSE],
+                         allowed_dependence = allowed_dependence[,!quantile_utility_idx, drop = FALSE],
                          method = "expected", path_tracking = path_tracking)
   }
 
   if (all(quantile_utility_idx)){
-    if (any(quantile_utility_idx[globale_tau]) & any(!quantile_utility_idx[globale_tau])){
-      global_quantile = quantile_utility_idx & globale_tau
+    if (any(quantile_utility_idx[globale_tau]) & any(quantile_utility_idx[!globale_tau])){
       m = function(X){
-        res = cbind(m_quantile_glob(X), m_quantile_ind(X))[, c(which(global_quantile),
-                                                               which(!global_quantile))]
-        colnames(res) = colnames(Y)
-        res
+        cbind(m_quantile_glob(X), m_quantile_ind(X)) %>%
+          as.data.frame() %>% select(!!colnames(Y))
       }
+      beta = cbind(formals(m_quantile_glob)$beta,
+                   formals(m_quantile_ind)$beta)
     }else{
       m = m_quantile
+      beta = formals(m)$beta
     }
   }else if (all(!quantile_utility_idx)) {
     m = m_expect
+    beta = formals(m)$beta
   }else{
     if (any(quantile_utility_idx[globale_tau]) & any(quantile_utility_idx[!globale_tau])){
       global_quantile = quantile_utility_idx & globale_tau
       ind_quantile = quantile_utility_idx & !globale_tau
 
       m = function(X){
-        res = cbind(m_quantile_glob(X), m_quantile_ind(X), m_expect(X))[
-          , c(which(global_quantile),
-              which(ind_quantile),
-              which(!quantile_utility_idx))]
-        colnames(res) = colnames(Y)
-        res
+        cbind(m_quantile_glob(X), m_quantile_ind(X), m_expect(X)) %>%
+          as.data.frame() %>% select(!!colnames(Y))
       }
+
+      beta = cbind(formals(m_quantile_glob)$beta,
+                   formals(m_quantile_ind)$beta,
+                   formals(m_expect)$beta)
+
     }else{
       m = function(X){
-        res = cbind(m_quantile(X), m_expect(X))[, c(which(quantile_utility_idx),
-                                                    which(!quantile_utility_idx))]
-        colnames(res) = colnames(Y)
-        res
+        cbind(m_quantile(X), m_expect(X)) %>%
+          as.data.frame() %>% select(!!colnames(Y))
       }
+
+      beta = cbind(formals(m_quantile)$beta,
+                   formals(m_expect)$beta)
     }
 
   }
 
 
-  #tunage nsga parametres
-  # if (is.null(TT)) TT = 20
-  # if (is.null(N)) N = round(NROW(X)/2)
+  mask = apply(!is.na(Y), 1, all)
+  X = X[mask,]
+  Y = Y[mask,]
 
-  if (X_space_csrt){
-    #tracking
-    if (is.function(updateProgress)) {
-      updateProgress(detail = "Decision constraint training")
+  summary(X)
+  #remove id
+  X = X[,-1,F]
+
+  if (optim_method == "real_ind"){
+    time_deb = Sys.time()
+    Y_obj <- m(X) %>% as.data.frame() %>% mutate(id = 1:NROW(.))
+    Y_obj$rank = dominance_ranking(Y_obj[,-NCOL(Y_obj)], rep("max", p))
+    Y_obj = crowding_distance(Y_obj)
+    Y_obj = Y_obj %>% filter(rank == 1, crowding_distance > 0)
+
+    res = list(X = X[Y_obj$id,], Y = Y_obj[,1:p], time = Sys.time() - time_deb,
+               fn = m, g = g, X0 = X, all_front = NULL, sens = rep("max", p))
+    class(res) = "nsga"
+
+    Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+    res$Y = sweep(res$Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+    res$Y0 = Y
+    colnames(res$Y) = colnames(Y)
+
+  }else if (optim_method == "nsga"){
+
+    if (X_space_csrt){
+      #tracking
+      if (is.function(updateProgress)) {
+        updateProgress(detail = "Decision constraint training")
+      }
+      tracking_msg(path_tracking, msg = "Decision constraint training")
+
+      cat("Train belonging to density constraint \n")
+      cstr_X_space = def_cstr_X_space(X, alpha = alpha,
+                                      path_tracking = path_tracking)
+      g$cstr_X_space = cstr_X_space$g
     }
-    tracking_msg(path_tracking, msg = "Decision constraint training")
-
-    cat("Train belonging to density constraint \n")
-    X_space_csrt = def_cstr_X_space(X, alpha = alpha,
-                                    path_tracking = path_tracking)
-    g$cstr_X_space = X_space_csrt$g
-  }
 
 
-  if (any(sapply(X, is.numeric))){
-    mutation_method = "mixte"
+    if (any(sapply(X, is.numeric))){
+      mutation_method = "mixte"
+    }else{
+      mutation_method = "simple"
+    }
+
+    res = NSGA(
+      X = X,
+      fn = m,
+      n_objective = p,
+      sens = rep("max", p),
+      g = g,
+      mutation_method = mutation_method,
+      updateProgress = updateProgress,
+      path_tracking = path_tracking,
+      ...
+    )
+    Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+    res$Y = sweep(res$Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
+    res$Y0 = Y
+    colnames(res$Y) = colnames(Y)
   }else{
-    mutation_method = "simple"
+    warning("optim_method must be in c('nsga', 'real_ind'), no optimisation done")
+    res=list()
   }
-
-  res = NSGA(
-    X = X,
-    fn = m,
-    n_objective = p,
-    sens = rep("max", p),
-    g = g,
-    mutation_method = mutation_method,
-    updateProgress = updateProgress,
-    path_tracking = path_tracking,
-    ...
-  )
 
   if (is.function(updateProgress)) {
     updateProgress(detail = "end")
   }
   tracking_msg(path_tracking, msg = "End")
 
-  #mise en forme des resultats ##### a modifier aussi
-  if (sum(globale_tau) >= 2){
-    res$tau_j = qrgr$tau
-    res$globale_confiance = qrgr$globale_confiance
+  #mise en forme des resultats
+  if (any(quantile_utility_idx)){
+    res$tau_j = rep("-", p)
+    res$tau_j = tau[quantile_utility_idx]
+    mask = apply(!is.na(Y), 1, all)
+    res$globale_confiance = rep("-", p)
+    if (NROW(X)>0){
+      res$globale_confiance[quantile_utility_idx] =
+        rep(sum(apply( Y[mask,quantile_utility_idx] -
+                        m(X[mask,])[,quantile_utility_idx] > 0, 1, all))/n, sum(quantile_utility_idx))
+    }
+    if (sum(quantile_utility_idx[globale_tau]) >= 2){
+      res$tau_j[quantile_utility_idx & globale_tau] = round(qrgr$tau, 3)
+      res$globale_confiance[quantile_utility_idx & globale_tau] = round(qrgr$globale_confiance, 3)
+    }
   }else{
-    res$globale_confiance = sum(apply(Y - m(X) > 0, 1, all))/n
-    res$tau_j = rep(tau, p)
+    res$tau_j = rep("-", p)
+    res$globale_confiance = rep("-", p)
   }
 
-
-  # Y = Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
-  # res$Y = res$Y * sapply(sens, function(x) ifelse(x == "min", -1, 1))
-  Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
-  res$Y = sweep(res$Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
-
-  res$Y0 = Y
-  colnames(res$Y) = colnames(Y)
   res$tau = tau
-  res$X_space_csrt = X_space_csrt
+  # res$X_space_csrt = cstr_X_space
+  res$beta = beta
+  res$m = m
+  # res$R2 = R2
 
   res
 }

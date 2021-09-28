@@ -9,14 +9,17 @@ MOOVaR(
   Y,
   sens = rep("max", NCOL(Y)),
   quantile_utility_idx = rep(TRUE, NCOL(Y)),
+  optim_method = c("real_ind", "nsga", "none"),
   g = NULL,
-  X_space_csrt = TRUE,
+  X_space_csrt = FALSE,
   tau = rep(0.5, NCOL(Y)),
   globale_tau = rep(F, NCOL(Y)),
   alpha = 0.15,
   updateProgress = NULL,
   path_tracking = NULL,
   mutation_method = "simple",
+  allowed_dependence = matrix(TRUE, nrow = NCOL(X), ncol = NCOL(Y)),
+  seed_R2 = NULL,
   ...
 )
 }
