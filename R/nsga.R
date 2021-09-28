@@ -292,6 +292,8 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
                       as_list_plot = FALSE){
 
     library(magrittr)
+    res$X = as.data.frame(res$X)
+    res$Y = as.data.frame(res$Y)
     if (choice == "PF"){
         # colnames(res$Y0) = colnames(res$Y)
         is_fac = !sapply(res$X, is.numeric)
@@ -305,20 +307,30 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
         lapply(seq_len(NCOL(combi_y)), function(i){
 
             p = ggplot(dd) +
-                geom_point(aes_string(x = combi_y[1, i], y = combi_y[2, i]),
-                           colour = "blue", size = 2) +
-                xlab(combi_y[1, i]) + ylab(combi_y[2, i]) +
                 geom_point(data = res$Y0,
                            aes_string(x = combi_y[1, i], y = combi_y[2, i]),
-                           alpha = 0.3)
+                           alpha = 0.1)+
+                # geom_density2d_filled(data = res$Y0,
+                #                       aes_string(x = colnames(res$Y0)[1],
+                #                                  y = colnames(res$Y0)[2],
+                #                                  fill = "after_stat(level)"),
+                #                       breaks = c(0, 1/(1.2*NROW(res$Y0)), 1),
+                #                       colour = "black",
+                #                       alpha = 0.3) +
+                # scale_fill_manual(values = c(NA, "orange")) +
+                geom_point(aes_string(x = combi_y[1, i], y = combi_y[2, i]),
+                           colour = "blue", size = 2, alpha = 1) +
+                xlab(combi_y[1, i]) + ylab(combi_y[2, i]) +
+                theme_bw() #+
+                # theme(legend.position="none")
+
 
             if (NCOL(res$Y) < 3){
                 p + geom_line(data = df,
                               aes_string(x = combi_y[1, i], y = combi_y[2, i]),
-                              colour = "blue") +
-                    theme_bw()
+                              colour = "blue")
             }else{
-                p + theme_bw()
+                p
             }
 
         }) -> p_y
@@ -328,6 +340,7 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
                 p = ggplot(dd) +
                     geom_point(aes_string(x = 1, y = X_i)) +
                     xlab(X_i) +
+                    theme_bw() +
                     theme(axis.text.x = element_blank(),
                           axis.ticks.x = element_blank())
             }else{
@@ -336,6 +349,7 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
                         label = !! rlang::sym(X_i))) +
                     ylim(0.5, nlevels(res$X[, X_i])+0.5) +
                     xlab(X_i) +
+                    theme_bw() +
                     theme(axis.text = element_blank(),
                           axis.ticks = element_blank(),
                           axis.title.y = element_blank())
@@ -344,7 +358,7 @@ plot.nsga <- function(res, choice = "PF", alpha_ellipse = NULL, mc_cores = 1,
             # if (NCOL(res$X) > 5){
             #     p + theme(axis.title.x = element_text(angle = 90))
             # }else{
-            p + theme_bw()
+            p
             # }
         }) -> p_x
 
