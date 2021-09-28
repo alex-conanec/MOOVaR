@@ -8,8 +8,12 @@ quant_reg_global_risk(
   X,
   Y,
   tau,
-  floor = 5/NROW(X),
+  allowed_dependence,
+  initial_eta = 2.5,
+  k = 0.2,
+  floor = 10/NROW(X),
   max_iter = 20,
+  tune = FALSE,
   path_tracking = NULL
 )
 }
