@@ -7,6 +7,7 @@
 fit_model(
   X,
   Y,
+  allowed_dependence,
   reg_method = "linear",
   tau = NULL,
   method = "quantile",
