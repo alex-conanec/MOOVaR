@@ -81,7 +81,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
                    updateProgress = NULL,
                    path_tracking = NULL,
                    mutation_method = "simple",
-                   allowed_dependence = matrix(TRUE, nrow = NCOL(X), ncol = NCOL(Y)),
+                   allowed_dependence = matrix(TRUE, nrow = NCOL(X)-1, ncol = NCOL(Y)),
                    seed_R2 = NULL,
                    ...){
 
@@ -149,7 +149,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
   }
 
   if (all(quantile_utility_idx)){
-    if (any(quantile_utility_idx[globale_tau]) & any(quantile_utility_idx[!globale_tau])){
+    if (sum(quantile_utility_idx[globale_tau]) > 1 & any(quantile_utility_idx[!globale_tau])){
       m = function(X){
         cbind(m_quantile_glob(X), m_quantile_ind(X)) %>%
           as.data.frame() %>% select(!!colnames(Y))
@@ -164,7 +164,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
     m = m_expect
     beta = formals(m)$beta
   }else{
-    if (any(quantile_utility_idx[globale_tau]) & any(quantile_utility_idx[!globale_tau])){
+    if (sum(quantile_utility_idx[globale_tau]) > 1 & any(quantile_utility_idx[!globale_tau])){
       global_quantile = quantile_utility_idx & globale_tau
       ind_quantile = quantile_utility_idx & !globale_tau
 
@@ -200,6 +200,21 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
 
   if (optim_method == "real_ind"){
     time_deb = Sys.time()
+
+    if (length(g) > 0){
+      feasible = sapply(g, function(gg){
+        gg(X)
+      })
+      feasible = apply(feasible, 1, all)
+      X = X[feasible,]
+      Y = Y[feasible,]
+
+      threshold = 2
+      if (NROW(X) < threshold){
+        stop(paste0("must provide at least", threshold, "feasible solution at the begenning"))
+      }
+    }
+
     Y_obj <- m(X) %>% as.data.frame() %>% mutate(id = 1:NROW(.))
     Y_obj$rank = dominance_ranking(Y_obj[,-NCOL(Y_obj)], rep("max", p))
     Y_obj = crowding_distance(Y_obj)
@@ -208,7 +223,6 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
     res = list(X = X[Y_obj$id,], Y = Y_obj[,1:p], time = Sys.time() - time_deb,
                fn = m, g = g, X0 = X, all_front = NULL, sens = rep("max", p))
     class(res) = "nsga"
-
     Y = sweep(Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
     res$Y = sweep(res$Y, 2, sapply(sens, function(x) ifelse(x == "min", -1, 1)), "*")
     res$Y0 = Y
@@ -286,6 +300,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
   res$beta = beta
   res$m = m
   # res$R2 = R2
+
 
   res
 }

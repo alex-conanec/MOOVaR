@@ -18,7 +18,7 @@ MOOVaR(
   updateProgress = NULL,
   path_tracking = NULL,
   mutation_method = "simple",
-  allowed_dependence = matrix(TRUE, nrow = NCOL(X), ncol = NCOL(Y)),
+  allowed_dependence = matrix(TRUE, nrow = NCOL(X) - 1, ncol = NCOL(Y)),
   seed_R2 = NULL,
   ...
 )
