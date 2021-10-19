@@ -74,7 +74,7 @@ rr = c(-0.5, 0, 0.5)
 names(rr) = rr
 tau_list = c(0.05, 0.15, 0.3, 0.5)
 names(tau_list) = tau_list
-
+X = X %>% mutate(id=1:NROW(.)) %>% select(id, everything())
 res_all = lapply(rr, function(r){
   C = matrix(r, 3, 3)
   diag(C) = 1
@@ -86,9 +86,10 @@ res_all = lapply(rr, function(r){
   res_list = lapply(tau_list, function(tau){
     lapply(c(FF=FALSE, TT=TRUE), function(globale_tau){
       MOOVaR(X, Y, tau = rep(tau, NCOL(Y)),
-               globale_tau = rep(globale_tau, NCOL(Y)),
-               X_space_csrt = FALSE,
-               TT = 20, sens = rep("max", p))
+             globale_tau = rep(globale_tau, NCOL(Y)),
+             X_space_csrt = FALSE,
+             optim_method = "nsga",
+             TT = 20, sens = rep("max", p))
     })
   })
 
@@ -201,7 +202,7 @@ ggplot(df) +
   xlab(TeX("$1-\\tau$")) +
   theme_bw()
 
-ggsave(filename = paste0(path, "HI_simu_tau.png"))
+# ggsave(filename = paste0(path, "HI_simu_tau.png"))
 
 ggplot(df %>% filter(Méthode == "Ajustée")) +
   geom_point(aes(x = un_moins_tau, y = tau_moy, colour = r), shape = 2) +
@@ -209,5 +210,5 @@ ggplot(df %>% filter(Méthode == "Ajustée")) +
   xlab(TeX("$1-\\tau$")) +
   ylab(TeX("$1/n \\sum_j \\tau + \\lambda^{(j)}$")) +
   theme_bw()
-ggsave(filename = paste0(path, "penalite_simu_tau.png"))
+# ggsave(filename = paste0(path, "penalite_simu_tau.png"))
 ```
