@@ -17,6 +17,7 @@ Imports:
     plotly,
     purrr,
     solitude,
+    glmnet,
     hqreg,
     ggplot2
 Suggests:
