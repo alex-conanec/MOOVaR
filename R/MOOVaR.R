@@ -156,13 +156,19 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
       }
       beta = cbind(formals(m_quantile_glob)$beta,
                    formals(m_quantile_ind)$beta)
+      n_models = as.data.frame(t(sapply(formals(m)$X_list, function(a) a$n)))
+      colnames(n_models) = colnames(beta)
     }else{
       m = m_quantile
       beta = formals(m)$beta
+      n_models = as.data.frame(t(sapply(formals(m)$X_list, function(a) a$n)))
+      colnames(n_models) = colnames(beta)
     }
   }else if (all(!quantile_utility_idx)) {
     m = m_expect
     beta = formals(m)$beta
+    n_models = as.data.frame(t(sapply(formals(m)$X_list, function(a) a$n)))
+    colnames(n_models) = colnames(beta)
   }else{
     if (sum(quantile_utility_idx[globale_tau]) > 1 & any(quantile_utility_idx[!globale_tau])){
       global_quantile = quantile_utility_idx & globale_tau
@@ -177,6 +183,12 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
                    formals(m_quantile_ind)$beta,
                    formals(m_expect)$beta)
 
+      n_models = cbind(as.data.frame(t(sapply(formals(m_quantile_glob)$X_list, function(a) a$n))),
+                       as.data.frame(t(sapply(formals(m_quantile_ind)$X_list, function(a) a$n))),
+                       as.data.frame(t(sapply(formals(m_expect)$X_list, function(a) a$n))))
+
+      colnames(n_models) = colnames(beta)
+
     }else{
       m = function(X){
         cbind(m_quantile(X), m_expect(X)) %>%
@@ -185,10 +197,22 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
 
       beta = cbind(formals(m_quantile)$beta,
                    formals(m_expect)$beta)
+
+      n_models = cbind(as.data.frame(t(sapply(formals(m_quantile)$X_list, function(a) a$n))),
+                       as.data.frame(t(sapply(formals(m_expect)$X_list, function(a) a$n))))
+
+      colnames(n_models) = colnames(beta)
+
+
+      # globale_tau
+      # quantile_utility_idx
+
     }
 
   }
 
+  beta = beta %>% as.data.frame() %>% select(!!col_names_Y) %>% as.matrix()
+  n_models = n_models %>% select(!!col_names_Y)
 
   mask = apply(!is.na(Y), 1, all)
   X = X[mask,]
@@ -300,7 +324,7 @@ MOOVaR <- function(X, Y, sens = rep("max", NCOL(Y)),
   res$beta = beta
   res$m = m
   # res$R2 = R2
-
+  res$n_models = n_models
 
   res
 }

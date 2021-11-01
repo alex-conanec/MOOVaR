@@ -56,7 +56,8 @@ fit_model = function(X, Y, allowed_dependence, reg_method = "linear", tau = NULL
       sd = sd,
       mask_dupli = mask_dupli,
       mask_na_yj = mask_na_yj,
-      id = id
+      id = id,
+      n = NROW(X_mat)
     )
 
   })
